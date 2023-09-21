@@ -1,6 +1,6 @@
 local api, fn = vim.api, vim.fn
 
-local notify = require("Zig.lib.notify")
+local lib_notify = require("Zig.lib.notify")
 local util = require("Zig.lib.util")
 
 local command_store = {}
@@ -13,7 +13,7 @@ end
 
 -- the default function when command `Zig` execute
 local function default_exec()
-    notify.Info(string.format("Hello, version is %s", util.version()))
+    lib_notify.Info(string.format("Version is %s", util.version()))
 end
 
 -- exec run function
@@ -26,7 +26,7 @@ local function exec(key, args)
         if command_store[key] then
             pcall(command_store[key].run, args)
         else
-            notify.Warn(string.format("command %s not exist!", key))
+            lib_notify.Warn(string.format("command %s not exist!", key))
         end
     end
 end
