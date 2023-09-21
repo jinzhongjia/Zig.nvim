@@ -1,4 +1,4 @@
-local lib_notify = require("Zig..lib.notify")
+local lib_notify = require("Zig.lib.notify")
 
 --- @type zig_config
 local default_config = {
