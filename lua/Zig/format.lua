@@ -2,11 +2,12 @@ local uv, api = vim.uv, vim.api
 local command = require("Zig.command")
 local lib_async = require("Zig.lib.async")
 local lib_debug = require("Zig.lib.debug")
+local lib_notify = require("Zig.lib.notify")
 local lib_util = require("Zig.lib.util")
 
 local M = {}
 
-local original_lines
+local g_original_lines
 
 ---@param a? string
 ---@param b? string
@@ -113,6 +114,8 @@ M.apply_format = function(bufnr, original_lines, new_lines)
     table.remove(original_lines)
     table.remove(new_lines)
 
+    --- @type table
+    --- @diagnostic disable-next-line: assign-type-mismatch
     local indices = vim.diff(original_text, new_text, {
         result_type = "indices",
         algorithm = "histogram",
@@ -122,13 +125,6 @@ M.apply_format = function(bufnr, original_lines, new_lines)
     for _, idx in ipairs(indices) do
         local orig_line_start, orig_line_count, new_line_start, new_line_count =
             unpack(idx)
-        lib_debug.debug(idx)
-        lib_debug.debug(
-            orig_line_start,
-            orig_line_count,
-            new_line_start,
-            new_line_count
-        )
         local is_insert = orig_line_count == 0
         local is_delete = new_line_count == 0
         local is_replace = not is_insert and not is_delete
@@ -162,49 +158,123 @@ M.apply_format = function(bufnr, original_lines, new_lines)
     vim.lsp.util.apply_text_edits(text_edits, bufnr, "utf-8")
 end
 
-local function format_file() end
-
-local function format_buffer()
-    local current_buffer = api.nvim_get_current_buf()
-    local filetype = api.nvim_get_option_value("filetype", {
-        buf = current_buffer,
-    })
-    if filetype ~= "zig" then
+local function format_file(path)
+    local fd = uv.fs_open(path, "r", 438)
+    if not fd then
+        lib_notify.Info("file is not exist!")
         return
     end
-    original_lines = vim.api.nvim_buf_get_lines(current_buffer, 0, -1, false)
+    local status = uv.fs_fstat(fd)
+    if not status then
+        lib_notify.Info("get file status fails!")
+        return
+    end
+    if status.type ~= "file" then
+        lib_notify.Info("please input a file path!")
+        return
+    end
 
-    local buffer_text = table.concat(original_lines, "\n")
+    local file_name = assert(vim.fs.basename(path))
+    local arr = vim.fn.split(file_name, "\\.")
+    local type = arr[#arr]
+    if type ~= "zon" and type ~= "zig" then
+        lib_notify.Info('your file in not "*.zig" or ".zon"')
+        return
+    end
 
-    local stdin, process = lib_async.spawn(
+    local stdin = assert(uv.new_pipe())
+    local stdout = assert(uv.new_pipe())
+    local stderr = assert(uv.new_pipe())
+
+    lib_async.spawn(
         "zig",
         ---@diagnostic disable-next-line: missing-fields
         {
+            stdio = {
+                ---@diagnostic disable-next-line: assign-type-mismatch
+                stdin,
+                ---@diagnostic disable-next-line: assign-type-mismatch
+                stdout,
+                ---@diagnostic disable-next-line: assign-type-mismatch
+                stderr,
+            },
+            args = {
+                "fmt",
+                path,
+            },
+        },
+        ---@diagnostic disable-next-line: unused-local
+        function(code, signal)
+            --- @type string
+            local message
+            if code == 0 then
+                message = "format file success!"
+            else
+                message = "format file fails!"
+            end
+            vim.schedule(function()
+                lib_notify.Info(message)
+            end)
+        end,
+        ---@diagnostic disable-next-line: unused-local
+        function(err, data) end,
+        ---@diagnostic disable-next-line: unused-local
+        function(err, data)
+            if data then
+            end
+        end
+    )
+end
+
+local function format_buffer()
+    local current_buffer = api.nvim_get_current_buf()
+
+    local filetype = api.nvim_get_option_value("filetype", {
+        buf = current_buffer,
+    })
+
+    if filetype ~= "zig" then
+        return
+    end
+
+    g_original_lines = vim.api.nvim_buf_get_lines(current_buffer, 0, -1, false)
+
+    local buffer_text = table.concat(g_original_lines, "\n")
+
+    local stdin = assert(uv.new_pipe())
+    local stdout = assert(uv.new_pipe())
+    local stderr = assert(uv.new_pipe())
+
+    lib_async.spawn(
+        "zig",
+        ---@diagnostic disable-next-line: missing-fields
+        {
+            stdio = {
+                ---@diagnostic disable-next-line: assign-type-mismatch
+                stdin,
+                ---@diagnostic disable-next-line: assign-type-mismatch
+                stdout,
+                ---@diagnostic disable-next-line: assign-type-mismatch
+                stderr,
+            },
             args = {
                 "fmt",
                 "--stdin",
             },
         },
-        function(code, signal)
-            -- print(string.format("exit, code: %d, signal: %d", code, signal))
-        end,
+        function(code, signal) end,
         function(err, data)
             assert(not err, err)
             if data then
                 vim.schedule(function()
                     local output = vim.split(data, "\n", { plain = true })
                     table.remove(output)
-                    M.apply_format(current_buffer, original_lines, output)
+                    M.apply_format(current_buffer, g_original_lines, output)
                 end)
             end
         end,
         function(err, data)
             assert(not err, err)
-            -- if data then
-            --     print("stderr: ", data)
-            -- else
-            --     print("stderr end")
-            -- end
         end
     )
 
@@ -213,6 +283,7 @@ local function format_buffer()
     -- close the stdin
     uv.shutdown(stdin, function() end)
 end
+
 
 M.init = function()
     command.register_command("format", M.run, {})
