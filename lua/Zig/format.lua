@@ -217,9 +217,12 @@ local function format_file(path)
             end)
         end,
         ---@diagnostic disable-next-line: unused-local
-        function(err, data) end,
+        function(err, data)
+            assert(not err, err)
+        end,
         ---@diagnostic disable-next-line: unused-local
         function(err, data)
+            assert(not err, err)
             if data then
             end
         end
@@ -275,6 +278,12 @@ local function format_buffer()
         end,
         function(err, data)
             assert(not err, err)
+            if data then
+                vim.schedule(function()
+                    lib_notify.Info("format fails, please check syntax!")
+                    -- TODO:need fmt the err message
+                end)
+            end
         end
     )
 
@@ -283,7 +292,6 @@ local function format_buffer()
     -- close the stdin
     uv.shutdown(stdin, function() end)
 end
-
 
 M.init = function()
     command.register_command("format", M.run, {})
