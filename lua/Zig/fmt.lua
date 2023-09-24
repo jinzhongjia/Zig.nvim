@@ -1,12 +1,16 @@
 local uv, api = vim.uv, vim.api
 local command = require("Zig.command")
+local config = require("Zig.config")
 local lib_async = require("Zig.lib.async")
 local lib_notify = require("Zig.lib.notify")
 local lib_util = require("Zig.lib.util")
 
 local M = {}
 
-local command_key = "format"
+local command_key = "fmt"
+
+-- whether this module is initialized
+local is_initialized = false
 
 --- @type string[]
 local g_original_lines
@@ -101,7 +105,7 @@ local function create_text_edit(
     }
 end
 
-M.apply_format = function(bufnr, original_lines, new_lines)
+M.apply_fmt = function(bufnr, original_lines, new_lines)
     if not vim.api.nvim_buf_is_valid(bufnr) then
         return
     end
@@ -160,7 +164,7 @@ M.apply_format = function(bufnr, original_lines, new_lines)
     vim.lsp.util.apply_text_edits(text_edits, bufnr, "utf-8")
 end
 
-local function format_file(path)
+local function fmt_file(path)
     local fd = uv.fs_open(path, "r", 438)
     if not fd then
         lib_notify.Info("file is not exist!")
@@ -210,9 +214,9 @@ local function format_file(path)
             --- @type string
             local message
             if code == 0 then
-                message = "format file success!"
+                message = "fmt file success!"
             else
-                message = "format file fails!"
+                message = "fmt file fails!"
             end
             vim.schedule(function()
                 lib_notify.Info(message)
@@ -233,7 +237,7 @@ local function format_file(path)
     uv.shutdown(stderr)
 end
 
-local function format_buffer()
+local function fmt_buffer()
     local current_buffer = api.nvim_get_current_buf()
 
     local filetype = api.nvim_get_option_value("filetype", {
@@ -278,7 +282,7 @@ local function format_buffer()
                 vim.schedule(function()
                     local output = vim.split(data, "\n", { plain = true })
                     table.remove(output)
-                    M.apply_format(current_buffer, g_original_lines, output)
+                    M.apply_fmt(current_buffer, g_original_lines, output)
                 end)
             end
         end,
@@ -287,7 +291,7 @@ local function format_buffer()
             uv.shutdown(stderr)
             if data then
                 vim.schedule(function()
-                    lib_notify.Info("format fails, please check syntax!")
+                    lib_notify.Info("fmt fails, please check syntax!")
                     -- TODO:need fmt the err message
                 end)
             end
@@ -300,23 +304,39 @@ local function format_buffer()
     uv.shutdown(stdin)
 end
 
--- init for format
+-- init for fmt
 M.init = function()
+    if not config.options.fmt then
+        return
+    end
+
+    if is_initialized then
+        return
+    end
+
+    is_initialized = true
+
     command.register_command(command_key, M.run, {})
 end
 
--- deinit for format
+-- deinit for fmt
 M.deinit = function()
+    if not is_initialized then
+        return
+    end
+
+    is_initialized = false
+
     command.unregister_command(command_key)
 end
 
--- run for format
+-- run for fmt
 --- @param arg string?
 M.run = function(arg)
     if arg then
-        format_file(arg)
+        fmt_file(arg)
     else
-        format_buffer()
+        fmt_buffer()
     end
 end
 
