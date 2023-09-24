@@ -1,12 +1,14 @@
 local uv, api = vim.uv, vim.api
 local command = require("Zig.command")
 local lib_async = require("Zig.lib.async")
-local lib_debug = require("Zig.lib.debug")
 local lib_notify = require("Zig.lib.notify")
 local lib_util = require("Zig.lib.util")
 
 local M = {}
 
+local command_key = "format"
+
+--- @type string[]
 local g_original_lines
 
 ---@param a? string
@@ -223,10 +225,12 @@ local function format_file(path)
         ---@diagnostic disable-next-line: unused-local
         function(err, data)
             assert(not err, err)
-            if data then
-            end
         end
     )
+
+    uv.shutdown(stdin)
+    uv.shutdown(stdout)
+    uv.shutdown(stderr)
 end
 
 local function format_buffer()
@@ -265,9 +269,11 @@ local function format_buffer()
                 "--stdin",
             },
         },
+        ---@diagnostic disable-next-line: unused-local
         function(code, signal) end,
         function(err, data)
             assert(not err, err)
+            uv.shutdown(stdout)
             if data then
                 vim.schedule(function()
                     local output = vim.split(data, "\n", { plain = true })
@@ -278,6 +284,7 @@ local function format_buffer()
         end,
         function(err, data)
             assert(not err, err)
+            uv.shutdown(stderr)
             if data then
                 vim.schedule(function()
                     lib_notify.Info("format fails, please check syntax!")
@@ -290,15 +297,27 @@ local function format_buffer()
     -- write the buffer_text to stdin
     uv.write(stdin, buffer_text)
     -- close the stdin
-    uv.shutdown(stdin, function() end)
+    uv.shutdown(stdin)
 end
 
+-- init for format
 M.init = function()
-    command.register_command("format", M.run, {})
+    command.register_command(command_key, M.run, {})
 end
 
-M.run = function()
-    format_buffer()
+-- deinit for format
+M.deinit = function()
+    command.unregister_command(command_key)
+end
+
+-- run for format
+--- @param arg string?
+M.run = function(arg)
+    if arg then
+        format_file(arg)
+    else
+        format_buffer()
+    end
 end
 
 return M

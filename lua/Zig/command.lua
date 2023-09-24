@@ -49,8 +49,14 @@ M.init = function()
             end
 
             local args = vim.tbl_get(command_store, cmd[2], "args")
+
             if not args then
                 return {}
+            end
+
+            -- when args is function
+            if type(args) == "function" then
+                return args()
             end
 
             return args
@@ -66,6 +72,14 @@ M.register_command = function(command_key, run, args)
     command_store[command_key] = command_store[command_key] or {}
     command_store[command_key].run = run
     command_store[command_key].args = args
+end
+
+-- this function unregister command
+--- @param command_key string
+M.unregister_command = function(command_key)
+    if command_store[command_key] then
+        command_store[command_key] = nil
+    end
 end
 
 return M
