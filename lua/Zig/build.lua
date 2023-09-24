@@ -56,7 +56,7 @@ M.run = function(args)
     local stdout = assert(uv.new_pipe())
     local stderr = assert(uv.new_pipe())
 
-    lib_async.spawn(
+    local handle, pid = lib_async.spawn(
         "zig",
         ---@diagnostic disable-next-line: missing-fields
         {
@@ -97,6 +97,10 @@ M.run = function(args)
             -- lib_debug.debug(data)
         end
     )
+    if not handle then
+        lib_notify.Error("sorry, spawn process to build fails")
+        return
+    end
     -- uv.shutdown(stdin)
 end
 
