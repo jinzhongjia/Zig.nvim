@@ -192,7 +192,7 @@ local function fmt_file(path)
     local stdout = assert(uv.new_pipe())
     local stderr = assert(uv.new_pipe())
 
-    lib_async.spawn(
+    local handle, pid = lib_async.spawn(
         "zig",
         ---@diagnostic disable-next-line: missing-fields
         {
@@ -231,6 +231,10 @@ local function fmt_file(path)
             assert(not err, err)
         end
     )
+    if not handle then
+        lib_notify.Error("sorry, spawn process to fmt fails")
+        return
+    end
 
     uv.shutdown(stdin)
     uv.shutdown(stdout)
@@ -256,7 +260,7 @@ local function fmt_buffer()
     local stdout = assert(uv.new_pipe())
     local stderr = assert(uv.new_pipe())
 
-    lib_async.spawn(
+    local handle, pid = lib_async.spawn(
         "zig",
         ---@diagnostic disable-next-line: missing-fields
         {
@@ -297,6 +301,10 @@ local function fmt_buffer()
             end
         end
     )
+    if not handle then
+        lib_notify.Error("sorry, spawn process to fmt fails")
+        return
+    end
 
     -- write the buffer_text to stdin
     uv.write(stdin, buffer_text)

@@ -22,7 +22,7 @@ M.spawn = function(path, options, on_exit, on_out, on_err)
         uv.read_start(options.stdio[3], on_err)
     end
 
-    return { handle = handle, pid = pid }
+    return handle, pid
 end
 
 return M
