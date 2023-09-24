@@ -33,4 +33,18 @@ M.tbl_slice = function(tbl, start_idx, end_idx)
     return ret
 end
 
+-- try to find build.zig root path
+M.find_root = function()
+    local path_list = vim.fs.find("build.zig", {
+        upward = true,
+        stop = vim.uv.os_homedir(),
+        path = vim.uv.cwd(),
+    })
+    if #path_list == 0 then
+        return nil
+    end
+
+    return vim.fs.dirname(path_list[1])
+end
+
 return M
