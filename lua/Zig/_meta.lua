@@ -1,3 +1,4 @@
 --- @class zig_config
 --- @field filetype boolean? whether enable filetype setting automatically
 --- @field fmt boolean? whether enable fmt
+--- @field build boolean? whether enable build

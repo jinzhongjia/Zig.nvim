@@ -4,6 +4,7 @@ local lib_notify = require("Zig.lib.notify")
 local default_config = {
     filetype = true,
     fmt = true,
+    build = true,
 }
 
 -- Prevent plugins from being initialized multiple times

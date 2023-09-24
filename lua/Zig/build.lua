@@ -14,7 +14,7 @@ local command_key = "build"
 local is_initialized = false
 
 M.init = function()
-    if not config.options.fmt then
+    if not config.options.build then
         return
     end
 
