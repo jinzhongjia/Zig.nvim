@@ -18,7 +18,7 @@ end
 
 -- exec run function
 --- @param key string?
---- @param args any
+--- @param args string[]?
 local function exec(key, args)
     if key == nil then
         default_exec()
@@ -36,7 +36,13 @@ local M = {}
 -- init for the command
 M.init = function()
     api.nvim_create_user_command("Zig", function(args)
-        exec(unpack(args.fargs))
+        if #args.fargs > 0 then
+            local key = args.fargs[1]
+            table.remove(args.fargs, 1)
+            exec(key, args.fargs)
+        else
+            exec()
+        end
     end, {
         range = true,
         nargs = "*",

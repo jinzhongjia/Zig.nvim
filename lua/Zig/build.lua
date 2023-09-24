@@ -3,7 +3,6 @@ local uv = vim.uv
 local command = require("Zig.command")
 local config = require("Zig.config")
 local lib_async = require("Zig.lib.async")
-local lib_debug = require("Zig.lib.debug")
 local lib_notify = require("Zig.lib.notify")
 local lib_util = require("Zig.lib.util")
 
@@ -25,7 +24,7 @@ M.init = function()
 
     is_initialized = true
 
-    command.register_command(command_key, M.run, {})
+    command.register_command(command_key, M.run, { "run", "test" })
 end
 
 -- deinit for fmt
@@ -39,13 +38,21 @@ M.deinit = function()
     command.unregister_command(command_key)
 end
 
-M.run = function()
+--- @param args string[]
+M.run = function(args)
     local root_path = lib_util.find_root()
     if not root_path then
         lib_notify.Info("not found build.zig!")
         return
     end
-    local stdin = assert(uv.new_pipe())
+
+    local new_args = {}
+    table.insert(new_args, "build")
+    for _, arg in pairs(args) do
+        table.insert(new_args, arg)
+    end
+
+    -- local stdin = assert(uv.new_pipe())
     local stdout = assert(uv.new_pipe())
     local stderr = assert(uv.new_pipe())
 
@@ -55,20 +62,17 @@ M.run = function()
         {
             stdio = {
                 ---@diagnostic disable-next-line: assign-type-mismatch
-                stdin,
+                nil,
                 ---@diagnostic disable-next-line: assign-type-mismatch
                 stdout,
                 ---@diagnostic disable-next-line: assign-type-mismatch
                 stderr,
             },
             cwd = root_path,
-            args = {
-                "build",
-            },
+            args = new_args,
         },
         ---@diagnostic disable-next-line: unused-local
         function(code, signal)
-            lib_debug.debug("finish build")
             local message
             if code == 0 then
                 message = "build success!"
@@ -76,20 +80,24 @@ M.run = function()
                 message = "build fail!"
             end
             vim.schedule(function()
-                lib_notify.Info(message)
+                -- this will only notify when build fail or not more args
+                if code ~= 0 or #args == 0 then
+                    lib_notify.Info(message)
+                end
             end)
+            uv.shutdown(stdout)
+            uv.shutdown(stderr)
         end,
         function(err, data)
             assert(not err, err)
-            lib_debug.debug(data)
-            -- uv.shutdown(stdout)
+            -- lib_debug.debug(data)
         end,
         function(err, data)
             assert(not err, err)
-            -- uv.shutdown(stderr)
+            -- lib_debug.debug(data)
         end
     )
-    uv.shutdown(stdin)
+    -- uv.shutdown(stdin)
 end
 
 return M

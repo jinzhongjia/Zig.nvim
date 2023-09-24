@@ -331,10 +331,10 @@ M.deinit = function()
 end
 
 -- run for fmt
---- @param arg string?
+--- @param arg string[]
 M.run = function(arg)
-    if arg then
-        fmt_file(arg)
+    if #arg > 0 then
+        fmt_file(arg[1])
     else
         fmt_buffer()
     end
