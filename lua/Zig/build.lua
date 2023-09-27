@@ -1,8 +1,9 @@
-local uv = vim.uv
+local uv, api = vim.uv, vim.api
 
 local command = require("Zig.command")
 local config = require("Zig.config")
 local lib_async = require("Zig.lib.async")
+local lib_debug = require("Zig.lib.debug")
 local lib_notify = require("Zig.lib.notify")
 local lib_util = require("Zig.lib.util")
 
@@ -12,6 +13,24 @@ local command_key = "build"
 
 -- whether this module is initialized
 local is_initialized = false
+
+--- @param result string
+local function output_print(result)
+    api.nvim_notify(
+        string.format("Zig output:%s", result),
+        vim.log.levels.INFO,
+        {}
+    )
+end
+
+--- @param result string
+local function err_print(result)
+    api.nvim_notify(
+        string.format("Zig Stderr Print:%s", result),
+        vim.log.levels.WARN,
+        {}
+    )
+end
 
 M.init = function()
     if not config.options.build then
@@ -46,13 +65,19 @@ M.run = function(args)
         return
     end
 
+    --- @type boolean
+    local is_run = false
+
     local new_args = {}
     table.insert(new_args, "build")
     for _, arg in pairs(args) do
+        if arg == "run" then
+            is_run = true
+        end
         table.insert(new_args, arg)
     end
 
-    -- local stdin = assert(uv.new_pipe())
+    local stdin = assert(uv.new_pipe())
     local stdout = assert(uv.new_pipe())
     local stderr = assert(uv.new_pipe())
 
@@ -62,7 +87,7 @@ M.run = function(args)
         {
             stdio = {
                 ---@diagnostic disable-next-line: assign-type-mismatch
-                nil,
+                stdin,
                 ---@diagnostic disable-next-line: assign-type-mismatch
                 stdout,
                 ---@diagnostic disable-next-line: assign-type-mismatch
@@ -85,23 +110,33 @@ M.run = function(args)
                     lib_notify.Info(message)
                 end
             end)
+            uv.shutdown(stdin)
             uv.shutdown(stdout)
             uv.shutdown(stderr)
         end,
         function(err, data)
             assert(not err, err)
-            -- lib_debug.debug(data)
+            lib_debug.debug(data)
+            vim.schedule(function()
+                if is_run and data then
+                    output_print(data)
+                end
+            end)
         end,
         function(err, data)
             assert(not err, err)
-            -- lib_debug.debug(data)
+            vim.schedule(function()
+                if data then
+                    err_print(data)
+                end
+            end)
         end
     )
     if not handle then
         lib_notify.Error("sorry, spawn process to build fails")
         return
     end
-    -- uv.shutdown(stdin)
+    uv.shutdown(stdin)
 end
 
 return M
