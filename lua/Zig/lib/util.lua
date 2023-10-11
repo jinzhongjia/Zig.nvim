@@ -89,20 +89,18 @@ end
 --- @param path string
 --- @param callback function?
 M.mkdir = function(path, callback)
-    uv.fs_stat(path, function(err, _)
-        if err then
-            uv.fs_mkdir(path, 493, function(err_1, _)
-                if err_1 then
-                    vim.schedule(function()
-                        lib_notify.Warn(
-                            string.format("create directory %s fails", path)
-                        )
-                    end)
-                    return
-                end
-                if callback then
-                    callback()
-                end
+    if M.dir_exists(path) then
+        if callback then
+            callback()
+        end
+        return
+    end
+    uv.fs_mkdir(path, 493, function(err_1, _)
+        if err_1 then
+            vim.schedule(function()
+                lib_notify.Warn(
+                    string.format("create directory %s fails", path)
+                )
             end)
             return
         end
@@ -130,6 +128,14 @@ M.symlink = function(path, new_path, callback)
             callback()
         end
     end)
+end
+
+M.dir_exists = function(path)
+    local ok, fstat = pcall(M.fstat, path)
+    if not ok then
+        return false
+    end
+    return fstat.type == "directory"
 end
 
 return M

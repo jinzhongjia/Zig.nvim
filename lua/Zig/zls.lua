@@ -91,8 +91,11 @@ M.run = function(args)
 end
 
 M.install = function()
-    if vim.fn.isdirectory(config.options.zls.path) ~= 0 then
-        uv.fs_rmdir(config.options.zls.path)
+    if lib_util.dir_exists(config.options.zls.path) then
+        if vim.fn.delete(config.options.zls.path, "rf") ~= 0 then
+            lib_notify.Warn("Delete the existing file failed")
+            return
+        end
     end
 
     local link_zls = function()
@@ -169,8 +172,21 @@ M.install = function()
     end)
 end
 
-M.update = function() end
+M.update = function()
 
-M.uninstall = function() end
+end
+
+-- uninstall zls
+-- this will delete all files about zls
+M.uninstall = function()
+    if vim.fn.delete(config.options.zls.path, "rf") ~= 0 then
+        lib_notify.Warn("delete zls clone dir fails")
+        return
+    end
+    if vim.fn.delete(get_bin_dir(), "rf") ~= 0 then
+        lib_notify.Warn("delete zls bin dir fails")
+        return
+    end
+end
 
 return M
