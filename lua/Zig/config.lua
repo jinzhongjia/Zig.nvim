@@ -7,6 +7,7 @@ local default_zls_config = {
     enable = true,
     auto_install = true,
     path = string.format("%s/%s", default_data_path, "zls"),
+    build_mode = "ReleaseSafe",
 }
 
 --- @type zig_config

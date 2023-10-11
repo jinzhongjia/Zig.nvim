@@ -2,6 +2,7 @@
 --- @field enable boolean? -- whether enable zls
 --- @field auto_install boolean? -- whether automatically install zls
 --- @field path string? -- where zls will install
+--- @field build_mode ("Debug"|"ReleaseFast"|"ReleaseSafe"|"ReleaseSmall")? -- zls build mode
 
 --- @class zig_config
 --- @field filetype boolean? whether enable filetype setting automatically

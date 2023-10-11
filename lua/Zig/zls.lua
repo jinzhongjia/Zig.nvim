@@ -12,9 +12,11 @@ local default_data_path = vim.fn.stdpath("data") .. "/zig.nvim"
 -- whether this module is initialized
 local is_initialized = false
 
-local is_installed = false
-
 local command_key = "zls"
+
+local build_arg = function()
+    return string.format("-Doptimize=%s", config.options.zls.build_mode)
+end
 
 --- @param str string
 local function echo_ok(str)
@@ -40,10 +42,6 @@ M.init = function()
 
     is_initialized = true
 
-    if vim.fn.isdirectory(config.options.zls.path) ~= 0 then
-        is_installed = true
-    end
-
     command.register_command(
         command_key,
         M.run,
@@ -57,7 +55,6 @@ M.deinit = function()
     end
 
     is_initialized = false
-    is_installed = false
 
     command.unregister_command(command_key)
 end
@@ -117,8 +114,7 @@ M.install = function()
             cwd = config.options.zls.path,
             args = {
                 "build",
-                -- TODO: add build mode select
-                "-Doptimize=ReleaseSafe",
+                build_arg(),
             },
             stdio = {
                 nil,
@@ -132,7 +128,7 @@ M.install = function()
                 link_zls()
             else
                 vim.schedule(function()
-                    lib_notify.Warn("git clone zls fails, %s")
+                    lib_notify.Warn("build zls fails, %s")
                 end)
             end
         end)
@@ -173,7 +169,66 @@ M.install = function()
 end
 
 M.update = function()
+    if not lib_util.dir_exists(config.options.zls.path) then
+        M.install()
+        return
+    end
 
+    local build_zls = function()
+        local errout = uv.new_pipe()
+        ---@diagnostic disable-next-line: missing-fields
+        lib_async.spawn("zig", {
+            cwd = config.options.zls.path,
+            args = {
+                "build",
+                build_arg(),
+            },
+            stdio = {
+                nil,
+                nil,
+                ---@diagnostic disable-next-line: assign-type-mismatch
+                errout,
+            },
+        }, function(code, _)
+            if code == 0 then
+                echo_ok("update zls")
+            else
+                vim.schedule(function()
+                    lib_notify.Warn("build zls fails, %s")
+                end)
+            end
+        end)
+
+        ---@diagnostic disable-next-line: param-type-mismatch
+        uv.read_start(errout, function(err, data)
+            assert(not err, err)
+            if data then
+                vim.schedule(function()
+                    lib_notify.Warn(
+                        string.format("compile zls fails. err is %s", data)
+                    )
+                end)
+            end
+        end)
+    end
+
+    ---@diagnostic disable-next-line: missing-fields
+    lib_async.spawn("git", {
+        cwd = config.options.zls.path,
+        args = {
+            "pull",
+        },
+    }, function(code, signal)
+        if code ~= 0 then
+            vim.schedule(function()
+                lib_notify.Warn("git pull zls fails, %s")
+            end)
+            return
+        end
+
+        echo_ok("pull zlg")
+        build_zls()
+    end)
 end
 
 -- uninstall zls
