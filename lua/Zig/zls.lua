@@ -31,6 +31,15 @@ local function echo_ok(str)
     end)
 end
 
+local get_bin_dir = function()
+    return string.format("%s/bin", default_data_path)
+end
+
+-- get zls bin
+local get_bin = function()
+    return string.format("%s/zls", get_bin_dir())
+end
+
 M.init = function()
     if not config.options.build then
         return
@@ -47,6 +56,20 @@ M.init = function()
         M.run,
         { "install", "uninstall", "update" }
     )
+
+    do
+        -- in this scope
+        -- we will Try injecting neovim's environment variables
+        vim.env.PATH = string.format(
+            "%s%s%s",
+            vim.env.PATH,
+            lib_util.is_win() and ";" or ":",
+            get_bin_dir()
+        )
+    end
+    if lib_util.file_exists(get_bin()) then
+        M.config_lspconfig()
+    end
 end
 
 M.deinit = function()
@@ -57,15 +80,6 @@ M.deinit = function()
     is_initialized = false
 
     command.unregister_command(command_key)
-end
-
-local get_bin_dir = function()
-    return string.format("%s/bin", default_data_path)
-end
-
--- get zls bin
-local get_bin = function()
-    return string.format("%s/zls", get_bin_dir())
 end
 
 --- @param args string[]
@@ -241,6 +255,25 @@ M.uninstall = function()
     if vim.fn.delete(get_bin_dir(), "rf") ~= 0 then
         lib_notify.Warn("delete zls bin dir fails")
         return
+    end
+end
+
+M.config_lspconfig = function()
+    local current_opt = {}
+    local status_1, cmp_nvim_lsp = pcall(require, "cmp_nvim_lsp")
+    if status_1 then
+        current_opt.capabilities = cmp_nvim_lsp.default_capabilities()
+    end
+    current_opt = vim.tbl_deep_extend(
+        "force",
+        current_opt,
+        config.options.zls.lspconfig_opt
+    )
+    local status_2, lspconfig = pcall(require, "lspconfig")
+    if status_2 then
+        lspconfig.zls.setup(current_opt)
+    else
+        lib_notify.Warn("not found lspconfig")
     end
 end
 

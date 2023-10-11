@@ -8,6 +8,7 @@ local default_zls_config = {
     auto_install = true,
     path = string.format("%s/%s", default_data_path, "zls"),
     build_mode = "ReleaseSafe",
+    lspconfig_opt = {},
 }
 
 --- @type zig_config

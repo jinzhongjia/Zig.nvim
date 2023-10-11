@@ -6,6 +6,8 @@ local lib_notify = require("Zig.lib.notify")
 
 local version = "0.1.0"
 
+local is_win = vim.fn.has("win32")
+
 -- return Zig.nvim version
 M.version = function()
     return version
@@ -130,12 +132,35 @@ M.symlink = function(path, new_path, callback)
     end)
 end
 
+function M.fstat(path)
+    local fd = uv.fs_open(path, "r", 438)
+    ---@diagnostic disable-next-line: param-type-mismatch
+    local fstat = uv.fs_fstat(fd)
+    ---@diagnostic disable-next-line: param-type-mismatch
+    uv.fs_close(fd)
+    return fstat
+end
+
 M.dir_exists = function(path)
     local ok, fstat = pcall(M.fstat, path)
     if not ok then
         return false
     end
+    ---@diagnostic disable-next-line: need-check-nil
     return fstat.type == "directory"
+end
+
+M.file_exists = function(path)
+    local ok, fstat = pcall(M.fstat, path)
+    if not ok then
+        return false
+    end
+    return fstat.type == "file"
+end
+
+--- @return boolean
+M.is_win = function()
+    return is_win == 1
 end
 
 return M
