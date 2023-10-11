@@ -16,6 +16,19 @@ local is_installed = false
 
 local command_key = "zls"
 
+--- @param str string
+local function echo_ok(str)
+    vim.schedule(function()
+        api.nvim_echo({
+            { "Zig.nvim:", "" },
+            { " ", "" },
+            { str, "DiagnosticInfo" },
+            { " ", "" },
+            { "OK!", "DiagnosticOk" },
+        }, false, {}) -- code
+    end)
+end
+
 M.init = function()
     if not config.options.build then
         return
@@ -88,9 +101,7 @@ M.install = function()
                 string.format("%s/zig-out/bin/zls", config.options.zls.path),
                 get_bin(),
                 function()
-                    vim.schedule(function()
-                        lib_notify.Info("install zls success!")
-                    end)
+                    echo_ok("link zls")
                 end
             )
         end)
@@ -112,8 +123,9 @@ M.install = function()
                 ---@diagnostic disable-next-line: assign-type-mismatch
                 errout,
             },
-        }, function(code, signal)
+        }, function(code, _)
             if code == 0 then
+                echo_ok("build zls")
                 link_zls()
             else
                 vim.schedule(function()
@@ -151,6 +163,8 @@ M.install = function()
             end)
             return
         end
+
+        echo_ok("clone zlg")
         build_zls()
     end)
 end
