@@ -1,10 +1,20 @@
 local lib_notify = require("Zig.lib.notify")
 
+local default_data_path = vim.fn.stdpath("data") .. "/zig.nvim"
+
+--- @type zig_zls_config
+local default_zls_config = {
+    enable = true,
+    auto_install = true,
+    path = string.format("%s/%s", default_data_path, "zls"),
+}
+
 --- @type zig_config
 local default_config = {
     filetype = true,
     fmt = true,
     build = true,
+    zls = default_zls_config,
 }
 
 -- Prevent plugins from being initialized multiple times

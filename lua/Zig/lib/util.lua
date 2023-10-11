@@ -2,6 +2,7 @@ local uv = vim.uv
 local M = {}
 
 local lib_async = require("Zig.lib.async")
+local lib_notify = require("Zig.lib.notify")
 
 local version = "0.1.0"
 
@@ -81,6 +82,52 @@ M.get_zig_version = function(callback)
                 }
                 callback(version_data)
             end
+        end
+    end)
+end
+
+--- @param path string
+--- @param callback function?
+M.mkdir = function(path, callback)
+    uv.fs_stat(path, function(err, _)
+        if err then
+            uv.fs_mkdir(path, 493, function(err_1, _)
+                if err_1 then
+                    vim.schedule(function()
+                        lib_notify.Warn(
+                            string.format("create directory %s fails", path)
+                        )
+                    end)
+                    return
+                end
+                if callback then
+                    callback()
+                end
+            end)
+            return
+        end
+        if callback then
+            callback()
+        end
+    end)
+end
+
+--- @param path string
+--- @param new_path string
+--- @param callback function?
+M.symlink = function(path, new_path, callback)
+    uv.fs_symlink(path, new_path, function(err, _)
+        if err then
+            vim.schedule(function()
+                lib_notify.Warn(
+                    string.format("symlink %s to %s fails", path, new_path)
+                )
+            end)
+
+            return
+        end
+        if callback then
+            callback()
         end
     end)
 end

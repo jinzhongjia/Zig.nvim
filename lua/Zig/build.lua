@@ -3,7 +3,6 @@ local uv, api = vim.uv, vim.api
 local command = require("Zig.command")
 local config = require("Zig.config")
 local lib_async = require("Zig.lib.async")
-local lib_debug = require("Zig.lib.debug")
 local lib_notify = require("Zig.lib.notify")
 local lib_util = require("Zig.lib.util")
 
@@ -116,7 +115,6 @@ M.run = function(args)
         end,
         function(err, data)
             assert(not err, err)
-            lib_debug.debug(data)
             vim.schedule(function()
                 if is_run and data then
                     output_print(data)
