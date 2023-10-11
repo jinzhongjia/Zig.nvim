@@ -1,7 +1,7 @@
 local uv = vim.uv
 local M = {}
 
-local async = require("Zig.lib.async")
+local lib_async = require("Zig.lib.async")
 
 local version = "0.1.0"
 
@@ -54,7 +54,7 @@ end
 M.get_zig_version = function(callback)
     local stdout = uv.new_pipe()
     ---@diagnostic disable-next-line: missing-fields
-    async.spawn("zig", {
+    lib_async.spawn("zig", {
         args = { "version" },
         stdio = {
             nil,
