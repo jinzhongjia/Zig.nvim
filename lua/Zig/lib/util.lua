@@ -1,4 +1,7 @@
+local uv = vim.uv
 local M = {}
+
+local async = require("Zig.lib.async")
 
 local version = "0.1.0"
 
@@ -45,6 +48,41 @@ M.find_root = function()
     end
 
     return vim.fs.dirname(path_list[1])
+end
+
+--- @param callback fun(version: { majro: string, minor: string, patch: string, dev: boolean })
+M.get_zig_version = function(callback)
+    local stdout = uv.new_pipe()
+    ---@diagnostic disable-next-line: missing-fields
+    async.spawn("zig", {
+        args = { "version" },
+        stdio = {
+            nil,
+            ---@diagnostic disable-next-line: assign-type-mismatch
+            stdout,
+            nil,
+        },
+    })
+    ---@diagnostic disable-next-line: param-type-mismatch
+    uv.read_start(stdout, function(err, data)
+        assert(err == nil)
+        if data then
+            local parse = vim.version.parse(data, {})
+            if parse then
+                local version_data = {
+                    --- @type string
+                    majro = parse.major,
+                    --- @type string
+                    minor = parse.minor,
+                    --- @type string
+                    patch = parse.patch,
+                    --- @type boolean
+                    dev = string.find(parse.prerelease, "dev") ~= nil,
+                }
+                callback(version_data)
+            end
+        end
+    end)
 end
 
 return M
