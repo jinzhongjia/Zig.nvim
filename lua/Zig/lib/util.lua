@@ -1,6 +1,12 @@
+local uv = vim.uv
 local M = {}
 
+local lib_async = require("Zig.lib.async")
+local lib_notify = require("Zig.lib.notify")
+
 local version = "0.1.0"
+
+local is_win = vim.fn.has("win32")
 
 -- return Zig.nvim version
 M.version = function()
@@ -45,6 +51,116 @@ M.find_root = function()
     end
 
     return vim.fs.dirname(path_list[1])
+end
+
+--- @param callback fun(version: { majro: string, minor: string, patch: string, dev: boolean })
+M.get_zig_version = function(callback)
+    local stdout = uv.new_pipe()
+    ---@diagnostic disable-next-line: missing-fields
+    lib_async.spawn("zig", {
+        args = { "version" },
+        stdio = {
+            nil,
+            ---@diagnostic disable-next-line: assign-type-mismatch
+            stdout,
+            nil,
+        },
+    })
+    ---@diagnostic disable-next-line: param-type-mismatch
+    uv.read_start(stdout, function(err, data)
+        assert(err == nil)
+        if data then
+            local parse = vim.version.parse(data, {})
+            if parse then
+                local version_data = {
+                    --- @type string
+                    majro = parse.major,
+                    --- @type string
+                    minor = parse.minor,
+                    --- @type string
+                    patch = parse.patch,
+                    --- @type boolean
+                    dev = string.find(parse.prerelease, "dev") ~= nil,
+                }
+                callback(version_data)
+            end
+        end
+    end)
+end
+
+--- @param path string
+--- @param callback function?
+M.mkdir = function(path, callback)
+    if M.dir_exists(path) then
+        if callback then
+            callback()
+        end
+        return
+    end
+    uv.fs_mkdir(path, 493, function(err_1, _)
+        if err_1 then
+            vim.schedule(function()
+                lib_notify.Warn(
+                    string.format("create directory %s fails", path)
+                )
+            end)
+            return
+        end
+        if callback then
+            callback()
+        end
+    end)
+end
+
+--- @param path string
+--- @param new_path string
+--- @param callback function?
+M.symlink = function(path, new_path, callback)
+    uv.fs_symlink(path, new_path, function(err, _)
+        if err then
+            vim.schedule(function()
+                lib_notify.Warn(
+                    string.format("symlink %s to %s fails", path, new_path)
+                )
+            end)
+
+            return
+        end
+        if callback then
+            callback()
+        end
+    end)
+end
+
+function M.fstat(path)
+    local fd = uv.fs_open(path, "r", 438)
+    ---@diagnostic disable-next-line: param-type-mismatch
+    local fstat = uv.fs_fstat(fd)
+    ---@diagnostic disable-next-line: param-type-mismatch
+    uv.fs_close(fd)
+    return fstat
+end
+
+M.dir_exists = function(path)
+    local ok, fstat = pcall(M.fstat, path)
+    if not ok then
+        return false
+    end
+    ---@diagnostic disable-next-line: need-check-nil
+    return fstat.type == "directory"
+end
+
+M.file_exists = function(path)
+    local ok, fstat = pcall(M.fstat, path)
+    if not ok then
+        return false
+    end
+    return fstat.type == "file"
+end
+
+--- @return boolean
+M.is_win = function()
+    return is_win == 1
 end
 
 return M

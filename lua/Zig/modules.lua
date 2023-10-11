@@ -4,4 +4,5 @@ return {
     test = require("Zig.test"),
     fmt = require("Zig.fmt"),
     dependence = require("Zig.dependence"),
+    zls = require("Zig.zls"),
 }
