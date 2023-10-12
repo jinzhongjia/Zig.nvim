@@ -220,7 +220,7 @@ M.update = function()
                 echo_ok("update zls")
             else
                 vim.schedule(function()
-                    lib_notify.Warn("build zls fails, %s")
+                    lib_notify.Warn("build zls fails")
                 end)
             end
         end)
