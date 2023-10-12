@@ -9,6 +9,7 @@ local default_zls_config = {
     path = string.format("%s/%s", default_data_path, "zls"),
     build_mode = "ReleaseSafe",
     lspconfig_opt = {},
+    enable_lspconfig=false
 }
 
 --- @type zig_config
