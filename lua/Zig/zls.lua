@@ -57,18 +57,21 @@ M.init = function()
         { "install", "uninstall", "update" }
     )
 
-    do
-        -- in this scope
-        -- we will Try injecting neovim's environment variables
-        vim.env.PATH = string.format(
-            "%s%s%s",
-            vim.env.PATH,
-            lib_util.is_win() and ";" or ":",
-            get_bin_dir()
-        )
-    end
     if lib_util.file_exists(get_bin()) then
-        M.config_lspconfig()
+        do
+            -- in this scope
+            -- we will Try injecting neovim's environment variables
+            vim.env.PATH = string.format(
+                "%s%s%s",
+                vim.env.PATH,
+                lib_util.is_win() and ";" or ":",
+                get_bin_dir()
+            )
+        end
+
+        if config.options.zls.enable_lspconfig then
+            M.config_lspconfig()
+        end
     end
 end
 
@@ -102,11 +105,14 @@ M.run = function(args)
 end
 
 M.install = function()
-    if lib_util.dir_exists(config.options.zls.path) then
-        if vim.fn.delete(config.options.zls.path, "rf") ~= 0 then
-            lib_notify.Warn("Delete the existing file failed")
-            return
-        end
+    if not lib_util.delete_dir(config.options.zls.path) then
+        lib_notify.Warn("delete the existing dir fails")
+        return
+    end
+
+    if not lib_util.delete_dir(get_bin()) then
+        lib_notify.Warn("delete existing zls bin dir fails")
+        return
     end
 
     local link_zls = function()
@@ -123,6 +129,8 @@ M.install = function()
 
     local build_zls = function()
         local errout = uv.new_pipe()
+        -- TODO: add errorinformation collection
+        --
         ---@diagnostic disable-next-line: missing-fields
         lib_async.spawn("zig", {
             cwd = config.options.zls.path,
@@ -159,27 +167,31 @@ M.install = function()
             end
         end)
     end
+    do
+        -- TODO: add errorinformation collection
+        --
+        -- local stderr=uv.new_pipe()
+        ---@diagnostic disable-next-line: missing-fields
+        lib_async.spawn("git", {
+            args = {
+                "clone",
+                "--depth",
+                "1",
+                "https://github.com/zigtools/zls.git",
+                config.options.zls.path,
+            },
+        }, function(code, signal)
+            if code ~= 0 then
+                vim.schedule(function()
+                    lib_notify.Warn("git clone zls fails")
+                end)
+                return
+            end
 
-    ---@diagnostic disable-next-line: missing-fields
-    lib_async.spawn("git", {
-        args = {
-            "clone",
-            "--depth",
-            "1",
-            "https://github.com/zigtools/zls.git",
-            config.options.zls.path,
-        },
-    }, function(code, signal)
-        if code ~= 0 then
-            vim.schedule(function()
-                lib_notify.Warn("git clone zls fails, %s")
-            end)
-            return
-        end
-
-        echo_ok("clone zlg")
-        build_zls()
-    end)
+            echo_ok("clone zls")
+            build_zls()
+        end)
+    end
 end
 
 M.update = function()
@@ -248,14 +260,16 @@ end
 -- uninstall zls
 -- this will delete all files about zls
 M.uninstall = function()
-    if vim.fn.delete(config.options.zls.path, "rf") ~= 0 then
-        lib_notify.Warn("delete zls clone dir fails")
-        return
-    end
-    if vim.fn.delete(get_bin_dir(), "rf") ~= 0 then
+    if not lib_util.delete_file(get_bin()) then
         lib_notify.Warn("delete zls bin dir fails")
         return
     end
+    if not lib_util.delete_dir(config.options.zls.path) then
+        lib_notify.Warn("delete zls clone dir fails")
+        return
+    end
+
+    echo_ok("zls uninstall")
 end
 
 M.config_lspconfig = function()

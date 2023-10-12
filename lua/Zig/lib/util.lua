@@ -155,12 +155,29 @@ M.file_exists = function(path)
     if not ok then
         return false
     end
+    ---@diagnostic disable-next-line: need-check-nil
     return fstat.type == "file"
 end
 
 --- @return boolean
 M.is_win = function()
     return is_win == 1
+end
+
+--- @param path string
+M.delete_file = function(path)
+    if M.file_exists(path) then
+        return vim.fn.delete(path) == 0
+    end
+    return true
+end
+
+--- @param path string
+M.delete_dir = function(path)
+    if M.dir_exists(path) then
+        return vim.fn.delete(path, "rf") == 0
+    end
+    return true
 end
 
 return M

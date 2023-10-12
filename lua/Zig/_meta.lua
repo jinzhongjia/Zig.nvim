@@ -4,6 +4,7 @@
 --- @field path string? -- where zls will install
 --- @field build_mode ("Debug"|"ReleaseFast"|"ReleaseSafe"|"ReleaseSmall")? -- zls build mode
 --- @field lspconfig_opt table? -- opt for lspconfig
+--- @field enable_lspconfig boolean?-- whether enable lspconfig config
 
 --- @class zig_config
 --- @field filetype boolean? whether enable filetype setting automatically
