@@ -252,7 +252,7 @@ M.update = function()
             return
         end
 
-        echo_ok("pull zlg")
+        echo_ok("pull zls")
         build_zls()
     end)
 end
