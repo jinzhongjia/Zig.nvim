@@ -1,8 +1,8 @@
 return {
     autocmd = require("Zig.autocmd"),
     build = require("Zig.build"),
-    test = require("Zig.test"),
     fmt = require("Zig.fmt"),
-    dependence = require("Zig.dependence"),
     zls = require("Zig.zls"),
+    -- test = require("Zig.test"),
+    -- dependence = require("Zig.dependence"),
 }

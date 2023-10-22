@@ -132,31 +132,45 @@ M.symlink = function(path, new_path, callback)
     end)
 end
 
-function M.fstat(path)
-    local fd = uv.fs_open(path, "r", 438)
-    ---@diagnostic disable-next-line: param-type-mismatch
-    local fstat = uv.fs_fstat(fd)
-    ---@diagnostic disable-next-line: param-type-mismatch
-    uv.fs_close(fd)
-    return fstat
+--- @param path string
+--- @param callback fun(param:uv.aliases.fs_stat_table|nil)
+function M.fstat(path, callback)
+    uv.fs_open(path, "r", 438, function(err, fd)
+        assert(not err, err)
+        if fd then
+            uv.fs_fstat(fd, function(err_n, stat)
+                assert(not err_n, err_n)
+                uv.fs_close(fd)
+                callback(stat)
+            end)
+        else
+            callback(nil)
+        end
+    end)
 end
 
-M.dir_exists = function(path)
-    local ok, fstat = pcall(M.fstat, path)
-    if not ok then
-        return false
-    end
-    ---@diagnostic disable-next-line: need-check-nil
-    return fstat.type == "directory"
+--- @param path string
+--- @param callback fun(res:boolean)
+M.dir_exists = function(path, callback)
+    M.fstat(path, function(param)
+        if param then
+            callback(param.type == "directory")
+        else
+            callback(false)
+        end
+    end)
 end
 
-M.file_exists = function(path)
-    local ok, fstat = pcall(M.fstat, path)
-    if not ok then
-        return false
-    end
-    ---@diagnostic disable-next-line: need-check-nil
-    return fstat.type == "file"
+--- @param path string
+--- @param callback fun(res:boolean)
+M.file_exists = function(path, callback)
+    M.fstat(path, function(param)
+        if param then
+            callback(param.type == "file")
+        else
+            callback(false)
+        end
+    end)
 end
 
 --- @return boolean
@@ -165,19 +179,27 @@ M.is_win = function()
 end
 
 --- @param path string
-M.delete_file = function(path)
-    if M.file_exists(path) then
-        return vim.fn.delete(path) == 0
-    end
-    return true
+--- @param callback fun(res:boolean)
+M.delete_file = function(path, callback)
+    M.file_exists(path, function(res)
+        if res then
+            callback(vim.fn.delete(path) == 0)
+        else
+            callback(true)
+        end
+    end)
 end
 
 --- @param path string
-M.delete_dir = function(path)
-    if M.dir_exists(path) then
-        return vim.fn.delete(path, "rf") == 0
-    end
-    return true
+--- @param callback fun(res:boolean)
+M.delete_dir = function(path, callback)
+    M.dir_exists(path, function(res)
+        if res then
+            callback(vim.fn.delete(path, "rf") == 0)
+        else
+            callback(true)
+        end
+    end)
 end
 
 return M
