@@ -109,18 +109,31 @@ M.run = function(args)
 end
 
 M.install = function()
-    lib_util.delete_dir(config.options.zls.path, function(res)
+    -- local link_zls = function()
+    --     lib_util.mkdir(get_bin_dir(), function()
+    --         lib_util.symlink(
+    --             string.format("%s/zig-out/bin/zls", config.options.zls.path),
+    --             get_bin(),
+    --             function()
+    --                 echo_ok("link zls")
+    --             end
+    --         )
+    --     end)
+    -- end
+    -- link_zls()
+
+    lib_util.delete_file(get_bin(), function(res)
         if not res then
             vim.schedule(function()
-                lib_notify.Warn("delete the existing dir fails")
+                lib_notify.Warn("delete the existing zls bin file fails")
             end)
             return
         end
 
-        lib_util.delete_dir(get_bin(), function(res_n)
-            if not res then
+        lib_util.delete_dir(config.options.zls.path, function(res_n)
+            if not res_n then
                 vim.schedule(function()
-                    lib_notify.Warn("delete existing zls bin dir fails")
+                    lib_notify.Warn("delete existing zls git dir fails")
                 end)
                 return
             end
@@ -196,7 +209,7 @@ M.install = function()
                         "https://github.com/zigtools/zls.git",
                         config.options.zls.path,
                     },
-                }, function(code, signal)
+                }, function(code, _)
                     if code ~= 0 then
                         vim.schedule(function()
                             lib_notify.Warn("git clone zls fails")

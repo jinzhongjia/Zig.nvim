@@ -91,23 +91,25 @@ end
 --- @param path string
 --- @param callback function?
 M.mkdir = function(path, callback)
-    if M.dir_exists(path) then
-        if callback then
-            callback()
-        end
-        return
-    end
-    uv.fs_mkdir(path, 493, function(err_1, _)
-        if err_1 then
-            vim.schedule(function()
-                lib_notify.Warn(
-                    string.format("create directory %s fails", path)
-                )
+    M.dir_exists(path, function(res)
+        if res then
+            if callback then
+                callback()
+            end
+        else
+            uv.fs_mkdir(path, 493, function(err_1, _)
+                if err_1 then
+                    vim.schedule(function()
+                        lib_notify.Warn(
+                            string.format("create directory %s fails", path)
+                        )
+                    end)
+                    return
+                end
+                if callback then
+                    callback()
+                end
             end)
-            return
-        end
-        if callback then
-            callback()
         end
     end)
 end
@@ -135,11 +137,9 @@ end
 --- @param path string
 --- @param callback fun(param:uv.aliases.fs_stat_table|nil)
 function M.fstat(path, callback)
-    uv.fs_open(path, "r", 438, function(err, fd)
-        assert(not err, err)
+    uv.fs_open(path, "r", 438, function(_, fd)
         if fd then
-            uv.fs_fstat(fd, function(err_n, stat)
-                assert(not err_n, err_n)
+            uv.fs_fstat(fd, function(_, stat)
                 uv.fs_close(fd)
                 callback(stat)
             end)
@@ -183,7 +183,10 @@ end
 M.delete_file = function(path, callback)
     M.file_exists(path, function(res)
         if res then
-            callback(vim.fn.delete(path) == 0)
+            vim.schedule(function()
+                local tmp = vim.fn.delete(path) == 0
+                callback(tmp)
+            end)
         else
             callback(true)
         end
@@ -195,7 +198,9 @@ end
 M.delete_dir = function(path, callback)
     M.dir_exists(path, function(res)
         if res then
-            callback(vim.fn.delete(path, "rf") == 0)
+            vim.schedule(function()
+                callback(vim.fn.delete(path, "rf") == 0)
+            end)
         else
             callback(true)
         end
