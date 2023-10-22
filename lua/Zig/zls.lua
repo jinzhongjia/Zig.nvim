@@ -150,7 +150,7 @@ M.install = function()
                 link_zls()
             else
                 vim.schedule(function()
-                    lib_notify.Warn("build zls fails, %s")
+                    lib_notify.Warn("build zls fails")
                 end)
             end
         end)
@@ -247,7 +247,7 @@ M.update = function()
     }, function(code, signal)
         if code ~= 0 then
             vim.schedule(function()
-                lib_notify.Warn("git pull zls fails, %s")
+                lib_notify.Warn("git pull zls fails")
             end)
             return
         end
