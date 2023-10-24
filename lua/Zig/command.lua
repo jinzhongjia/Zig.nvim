@@ -1,5 +1,6 @@
 local api, fn = vim.api, vim.fn
 
+local lib_debug = require("Zig.lib.debug")
 local lib_notify = require("Zig.lib.notify")
 local util = require("Zig.lib.util")
 
@@ -62,10 +63,26 @@ M.init = function()
 
             -- when args is function
             if type(args) == "function" then
-                return args()
+                local args_new = {}
+                for i = 3, #cmd, 1 do
+                    if cmd[2] then
+                        table.insert(args_new, cmd[i])
+                    end
+                end
+                return args_new(args_new)
             end
 
-            return args
+            local tmp = args
+            for i = 3, #cmd, 1 do
+                local current_key = cmd[i]
+                if tmp[current_key] then
+                    tmp = tmp[current_key]
+                else
+                    return vim.tbl_keys(tmp)
+                end
+            end
+
+            return vim.tbl_keys(tmp)
         end,
     })
 end
@@ -73,7 +90,7 @@ end
 -- this function register command
 --- @param command_key string
 --- @param run function
---- @param args string[]
+--- @param args table
 M.register_command = function(command_key, run, args)
     command_store[command_key] = command_store[command_key] or {}
     command_store[command_key].run = run

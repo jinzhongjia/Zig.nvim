@@ -42,7 +42,10 @@ M.init = function()
 
     is_initialized = true
 
-    command.register_command(command_key, M.run, { "run", "test" })
+    command.register_command(command_key, M.run, {
+        ["run"] = {},
+        ["test"] = {},
+    })
 end
 
 -- deinit for fmt

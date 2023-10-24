@@ -2,6 +2,8 @@ local uv, api = vim.uv, vim.api
 local command = require("Zig.command")
 local config = require("Zig.config")
 local lib_async = require("Zig.lib.async")
+local lib_debug = require("Zig.lib.debug")
+local lib_git = require("Zig.lib.git")
 local lib_notify = require("Zig.lib.notify")
 local lib_util = require("Zig.lib.util")
 
@@ -51,11 +53,13 @@ M.init = function()
 
     is_initialized = true
 
-    command.register_command(
-        command_key,
-        M.run,
-        { "install", "uninstall", "update" }
-    )
+    command.register_command(command_key, M.run, {
+        ["install"] = {},
+        ["uninstall"] = {},
+        ["update"] = {
+            ["force"] = {},
+        },
+    })
 
     lib_util.file_exists(get_bin(), function(res)
         if res then
@@ -102,26 +106,17 @@ M.run = function(args)
     elseif param == "uninstall" then
         M.uninstall()
     elseif param == "update" then
-        M.update()
+        if args[2] == "force" then
+            M.update(true)
+        else
+            M.update()
+        end
     else
         lib_notify.Info("not recognize param")
     end
 end
 
 M.install = function()
-    -- local link_zls = function()
-    --     lib_util.mkdir(get_bin_dir(), function()
-    --         lib_util.symlink(
-    --             string.format("%s/zig-out/bin/zls", config.options.zls.path),
-    --             get_bin(),
-    --             function()
-    --                 echo_ok("link zls")
-    --             end
-    --         )
-    --     end)
-    -- end
-    -- link_zls()
-
     lib_util.delete_file(get_bin(), function(res)
         if not res then
             vim.schedule(function()
@@ -155,8 +150,6 @@ M.install = function()
 
             local build_zls = function()
                 local errout = uv.new_pipe()
-                -- TODO: add errorinformation collection
-                --
                 ---@diagnostic disable-next-line: missing-fields
                 lib_async.spawn("zig", {
                     cwd = config.options.zls.path,
@@ -174,10 +167,6 @@ M.install = function()
                     if code == 0 then
                         echo_ok("build zls")
                         link_zls()
-                    else
-                        vim.schedule(function()
-                            lib_notify.Warn("build zls fails")
-                        end)
                     end
                 end)
 
@@ -197,35 +186,21 @@ M.install = function()
                 end)
             end
             do
-                -- TODO: add errorinformation collection
-                --
-                -- local stderr=uv.new_pipe()
-                ---@diagnostic disable-next-line: missing-fields
-                lib_async.spawn("git", {
-                    args = {
-                        "clone",
-                        "--depth",
-                        "1",
-                        "https://github.com/zigtools/zls.git",
-                        config.options.zls.path,
-                    },
-                }, function(code, _)
-                    if code ~= 0 then
-                        vim.schedule(function()
-                            lib_notify.Warn("git clone zls fails")
-                        end)
-                        return
+                lib_git.clone(
+                    "https://github.com/zigtools/zls.git",
+                    config.options.zls.path,
+                    function()
+                        echo_ok("clone zls")
+                        build_zls()
                     end
-
-                    echo_ok("clone zls")
-                    build_zls()
-                end)
+                )
             end
         end)
     end)
 end
 
-M.update = function()
+--- @param force boolean?
+M.update = function(force)
     lib_util.dir_exists(config.options.zls.path, function(res)
         if not res then
             M.install()
@@ -255,6 +230,7 @@ M.update = function()
                     end)
                 end
             end)
+            echo_ok("start build")
 
             ---@diagnostic disable-next-line: param-type-mismatch
             uv.read_start(errout, function(err, data)
@@ -269,23 +245,31 @@ M.update = function()
             end)
         end
 
-        ---@diagnostic disable-next-line: missing-fields
-        lib_async.spawn("git", {
-            cwd = config.options.zls.path,
-            args = {
-                "pull",
-            },
-        }, function(code, signal)
-            if code ~= 0 then
-                vim.schedule(function()
-                    lib_notify.Warn("git pull zls fails")
-                end)
-                return
+        lib_git.latest_commit(
+            config.options.zls.path,
+            false,
+            function(local_commit)
+                lib_git.latest_origin_commit(
+                    config.options.zls.path,
+                    function(remote_commit)
+                        if local_commit ~= remote_commit then
+                            lib_git.pull(config.options.zls.path, function()
+                                echo_ok("pull zls")
+                                build_zls()
+                            end)
+                        else
+                            if force then
+                                build_zls()
+                            else
+                                vim.schedule(function()
+                                    lib_notify.Info("zls is the latest")
+                                end)
+                            end
+                        end
+                    end
+                )
             end
-
-            echo_ok("pull zls")
-            build_zls()
-        end)
+        )
     end)
 end
 
