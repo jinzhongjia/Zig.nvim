@@ -53,7 +53,7 @@ M.find_root = function()
     return vim.fs.dirname(path_list[1])
 end
 
---- @param callback fun(version: { majro: string, minor: string, patch: string, dev: boolean })
+--- @param callback fun(version: { majro: string, minor: string, patch: string, prerelease: string, build: string, dev: boolean })
 M.get_zig_version = function(callback)
     local stdout = uv.new_pipe()
     ---@diagnostic disable-next-line: missing-fields
@@ -79,6 +79,10 @@ M.get_zig_version = function(callback)
                     minor = parse.minor,
                     --- @type string
                     patch = parse.patch,
+                    --- @type string
+                    build = parse.build,
+                    --- @type string
+                    prerelease = parse.prerelease,
                     --- @type boolean
                     dev = string.find(parse.prerelease, "dev") ~= nil,
                 }
