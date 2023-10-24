@@ -13,7 +13,7 @@ Usags:
 
 Just install this plugin with your plugin manager, and then refer below:
 
-```
+```lua
 local zig = require("Zig")
 zig.setup({
 -- config of plugin
@@ -22,6 +22,8 @@ zig.setup({
 
 Default config:
 ```lua
+local default_data_path = vim.fn.stdpath("data") .. "/zig.nvim"
+
 --- @type zig_zls_config
 local default_zls_config = {
     enable = true,
