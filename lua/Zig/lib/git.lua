@@ -13,6 +13,10 @@ M.fetch = function(path, callback)
         cwd = path,
         args = {
             "fetch",
+            "--recurse-submodules",
+            "--tags",
+            "--force",
+            "--progress",
         },
         stdio = {
             nil,
