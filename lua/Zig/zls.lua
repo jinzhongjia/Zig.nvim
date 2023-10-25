@@ -296,6 +296,44 @@ M.uninstall = function()
     end)
 end
 
+--- @param callbak fun(data:string)
+M.index_json = function(callbak)
+    local out = uv.new_pipe()
+    local errout = uv.new_pipe()
+    ---@diagnostic disable-next-line: missing-fields
+    lib_async.spawn("curl", {
+        stdio = {
+            nil,
+            ---@diagnostic disable-next-line: assign-type-mismatch
+            out,
+            ---@diagnostic disable-next-line: assign-type-mismatch
+            errout,
+        },
+        args = {
+            "-s",
+            "https://zigtools-releases.nyc3.digitaloceanspaces.com/zls/index.json",
+        },
+    }, function(_, _) end)
+    ---@diagnostic disable-next-line: param-type-mismatch
+    uv.read_start(out, function(err, data)
+        assert(not err, err)
+        if data then
+            callbak(data)
+        end
+    end)
+    ---@diagnostic disable-next-line: param-type-mismatch
+    uv.read_start(errout, function(err, data)
+        assert(not err, err)
+        if data then
+            vim.schedule(function()
+                lib_notify.Warn(
+                    string.format("curl download failed, err is %s", data)
+                )
+            end)
+        end
+    end)
+end
+
 M.config_lspconfig = function()
     local current_opt = {}
     local status_1, cmp_nvim_lsp = pcall(require, "cmp_nvim_lsp")
