@@ -17,6 +17,7 @@ M.fetch = function(path, callback)
             "--tags",
             "--force",
             "--progress",
+            "--quiet",
         },
         stdio = {
             nil,
@@ -108,6 +109,7 @@ M.pull = function(path, callback)
         cwd = path,
         args = {
             "pull",
+            "--quiet",
         },
         stdio = {
             nil,
