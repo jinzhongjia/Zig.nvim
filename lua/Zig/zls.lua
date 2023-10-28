@@ -113,6 +113,61 @@ local remove_zls_PATH = function()
     end
 end
 
+--- @param callback fun(version:string?)
+local get_zls_version = function(callback)
+    lib_util.file_exists(get_bin(), function(res)
+        if res then
+            local errout = uv.new_pipe()
+            local out = uv.new_pipe()
+            ---@diagnostic disable-next-line: missing-fields
+            local handle, pid = lib_async.spawn(get_bin(), {
+                args = {
+                    "--version",
+                },
+                stdio = {
+                    nil,
+                    ---@diagnostic disable-next-line: assign-type-mismatch
+                    out,
+                    ---@diagnostic disable-next-line: assign-type-mismatch
+                    errout,
+                },
+            }, function(code, _) end)
+
+            local tmp = true
+            ---@diagnostic disable-next-line: param-type-mismatch
+            uv.read_start(out, function(err, data)
+                assert(not err, err)
+
+                if tmp then
+                    if data then
+                        tmp = false
+                        callback(string.gsub(data, "\n", ""))
+                    else
+                        callback(nil)
+                    end
+                end
+            end)
+
+            ---@diagnostic disable-next-line: param-type-mismatch
+            uv.read_start(errout, function(err, data)
+                assert(not err, err)
+                if data then
+                    vim.schedule(function()
+                        lib_notify.Warn(
+                            string.format(
+                                "get zls version failed. err is %s",
+                                data
+                            )
+                        )
+                    end)
+                end
+            end)
+        else
+            callback(nil)
+        end
+    end)
+end
+
 M.init = function()
     if not config.options.build then
         return
@@ -130,6 +185,7 @@ M.init = function()
         ["update"] = {
             ["force"] = {},
         },
+        ["version"] = {},
     })
 
     add_zls_PATH()
@@ -167,6 +223,16 @@ M.run = function(args)
         else
             M.update()
         end
+    elseif param == "version" then
+        get_zls_version(function(version)
+            vim.schedule(function()
+                if version then
+                    lib_notify.Info(string.format("zls version: %s", version))
+                else
+                    lib_notify.Info("It seems you haven't installed zls yet")
+                end
+            end)
+        end)
     else
         lib_notify.Info("not recognize param")
     end
@@ -447,61 +513,6 @@ local source_update = function(force)
                 )
             end
         )
-    end)
-end
-
---- @param callback fun(version:string?)
-local get_zls_version = function(callback)
-    lib_util.file_exists(get_bin(), function(res)
-        if res then
-            local errout = uv.new_pipe()
-            local out = uv.new_pipe()
-            ---@diagnostic disable-next-line: missing-fields
-            local handle, pid = lib_async.spawn(get_bin(), {
-                args = {
-                    "--version",
-                },
-                stdio = {
-                    nil,
-                    ---@diagnostic disable-next-line: assign-type-mismatch
-                    out,
-                    ---@diagnostic disable-next-line: assign-type-mismatch
-                    errout,
-                },
-            }, function(code, _) end)
-
-            local tmp = true
-            ---@diagnostic disable-next-line: param-type-mismatch
-            uv.read_start(out, function(err, data)
-                assert(not err, err)
-
-                if tmp then
-                    if data then
-                        tmp = false
-                        callback(string.gsub(data, "\n", ""))
-                    else
-                        callback(nil)
-                    end
-                end
-            end)
-
-            ---@diagnostic disable-next-line: param-type-mismatch
-            uv.read_start(errout, function(err, data)
-                assert(not err, err)
-                if data then
-                    vim.schedule(function()
-                        lib_notify.Warn(
-                            string.format(
-                                "get zls version failed. err is %s",
-                                data
-                            )
-                        )
-                    end)
-                end
-            end)
-        else
-            callback(nil)
-        end
     end)
 end
 
