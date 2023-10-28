@@ -36,6 +36,7 @@ local default_source_install = {
 --- @type web_install
 local default_web_install = {
     version = "latest",
+    -- about more version, look at this: https://zigtools-releases.nyc3.digitaloceanspaces.com/zls/index.json
 }
 
 --- @type zig_zls_config
