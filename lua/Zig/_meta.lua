@@ -2,9 +2,12 @@
 --- @field enable boolean? -- whether enable zls
 --- @field auto_install boolean? -- whether automatically install zls
 --- @field path string? -- where zls will install
---- @field build_mode ("Debug"|"ReleaseFast"|"ReleaseSafe"|"ReleaseSmall")? -- zls build mode
 --- @field lspconfig_opt table? -- opt for lspconfig
 --- @field enable_lspconfig boolean?-- whether enable lspconfig config
+--- @field get_method ("source_build"|"web")?
+--- @field build_mode ("Debug"|"ReleaseFast"|"ReleaseSafe"|"ReleaseSmall")? -- zls build mode, only for source_build
+--- @field commit string? -- only for source_build
+--- @field web_version string? -- only for web
 
 --- @class zig_config
 --- @field filetype boolean? whether enable filetype setting automatically

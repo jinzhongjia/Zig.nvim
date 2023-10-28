@@ -13,6 +13,11 @@ M.fetch = function(path, callback)
         cwd = path,
         args = {
             "fetch",
+            "--recurse-submodules",
+            "--tags",
+            "--force",
+            "--progress",
+            "--quiet",
         },
         stdio = {
             nil,
@@ -104,6 +109,7 @@ M.pull = function(path, callback)
         cwd = path,
         args = {
             "pull",
+            "--quiet",
         },
         stdio = {
             nil,
@@ -135,13 +141,13 @@ M.clone = function(url, path, callback)
     local errout = uv.new_pipe()
     ---@diagnostic disable-next-line: missing-fields
     lib_async.spawn("git", {
-        cwd = path,
         args = {
             "clone",
             "--depth",
             "1",
             url,
             path,
+            "--quiet"
         },
         stdio = {
             nil,

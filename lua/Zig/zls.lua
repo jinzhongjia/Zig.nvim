@@ -116,6 +116,20 @@ M.run = function(args)
     end
 end
 
+--- @param callbak fun()
+local copy_zls = function(callbak)
+    lib_util.mkdir(get_bin_dir(), function()
+        lib_util.copy_file(
+            string.format("%s/zig-out/bin/zls", config.options.zls.path),
+            get_bin(),
+            function()
+                echo_ok("copy zls")
+                callbak()
+            end
+        )
+    end)
+end
+
 M.install = function()
     lib_util.delete_file(get_bin(), function(res)
         if not res then
@@ -131,21 +145,6 @@ M.install = function()
                     lib_notify.Warn("delete existing zls git dir fails")
                 end)
                 return
-            end
-
-            local link_zls = function()
-                lib_util.mkdir(get_bin_dir(), function()
-                    lib_util.symlink(
-                        string.format(
-                            "%s/zig-out/bin/zls",
-                            config.options.zls.path
-                        ),
-                        get_bin(),
-                        function()
-                            echo_ok("link zls")
-                        end
-                    )
-                end)
             end
 
             local build_zls = function()
@@ -166,7 +165,9 @@ M.install = function()
                 }, function(code, _)
                     if code == 0 then
                         echo_ok("build zls")
-                        link_zls()
+                        copy_zls(function()
+                            echo_ok("install zls")
+                        end)
                     end
                 end)
 
@@ -223,7 +224,10 @@ M.update = function(force)
                 },
             }, function(code, _)
                 if code == 0 then
-                    echo_ok("update zls")
+                    echo_ok("build zls")
+                    copy_zls(function()
+                        echo_ok("update zls")
+                    end)
                 else
                     vim.schedule(function()
                         lib_notify.Warn("build zls fails")
@@ -293,6 +297,44 @@ M.uninstall = function()
             end
             echo_ok("zls uninstall")
         end)
+    end)
+end
+
+--- @param callbak fun(data:string)
+M.index_json = function(callbak)
+    local out = uv.new_pipe()
+    local errout = uv.new_pipe()
+    ---@diagnostic disable-next-line: missing-fields
+    lib_async.spawn("curl", {
+        stdio = {
+            nil,
+            ---@diagnostic disable-next-line: assign-type-mismatch
+            out,
+            ---@diagnostic disable-next-line: assign-type-mismatch
+            errout,
+        },
+        args = {
+            "-s",
+            "https://zigtools-releases.nyc3.digitaloceanspaces.com/zls/index.json",
+        },
+    }, function(_, _) end)
+    ---@diagnostic disable-next-line: param-type-mismatch
+    uv.read_start(out, function(err, data)
+        assert(not err, err)
+        if data then
+            callbak(data)
+        end
+    end)
+    ---@diagnostic disable-next-line: param-type-mismatch
+    uv.read_start(errout, function(err, data)
+        assert(not err, err)
+        if data then
+            vim.schedule(function()
+                lib_notify.Warn(
+                    string.format("curl download failed, err is %s", data)
+                )
+            end)
+        end
     end)
 end
 
