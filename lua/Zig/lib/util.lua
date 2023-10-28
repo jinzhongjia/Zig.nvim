@@ -141,7 +141,7 @@ end
 --- @param path string
 --- @param callback fun(param:uv.aliases.fs_stat_table|nil)
 function M.fstat(path, callback)
-    uv.fs_open(path, "r", 438, function(_, fd)
+    uv.fs_open(path, "r", 438, function(err, fd)
         if fd then
             uv.fs_fstat(fd, function(_, stat)
                 uv.fs_close(fd)
@@ -236,11 +236,34 @@ M.copy_file = function(path, new_path, callback)
                 if res_n then
                     copy()
                 else
-                    vim.schedule(function ()
+                    vim.schedule(function()
                         lib_notify.Warn("delete existed file failed")
                     end)
                 end
             end)
+        end
+    end)
+end
+
+--- @param path string
+--- @param callback fun(res:boolean|nil)
+M.chmod_exec = function(path, callback)
+    local bit = require("bit")
+    -- see chmod(2)
+    local USR_EXEC = 0x40
+    local GRP_EXEC = 0x8
+    local ALL_EXEC = 0x1
+    local EXEC = bit.bor(USR_EXEC, GRP_EXEC, ALL_EXEC)
+    M.fstat(path, function(param)
+        if param then
+            if bit.band(param.mode, EXEC) ~= EXEC then
+                local plus_exec = bit.bor(param.mode, EXEC)
+                uv.fs_chmod(path, plus_exec, function(_, success)
+                    callback(success)
+                end)
+            end
+        else
+            callback(false)
         end
     end)
 end

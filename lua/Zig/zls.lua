@@ -2,12 +2,25 @@ local uv, api = vim.uv, vim.api
 local command = require("Zig.command")
 local config = require("Zig.config")
 local lib_async = require("Zig.lib.async")
+local lib_curl = require("Zig.lib.curl")
 local lib_debug = require("Zig.lib.debug")
 local lib_git = require("Zig.lib.git")
 local lib_notify = require("Zig.lib.notify")
 local lib_util = require("Zig.lib.util")
 
 local M = {}
+
+--- @class web_info
+--- @field latest string
+--- @field latest_tagged string
+--- @field version string
+
+--- @type web_info
+local web_info = {
+    latest = "",
+    latest_tagged = "",
+    version = "",
+}
 
 local default_data_path = vim.fn.stdpath("data") .. "/zig.nvim"
 
@@ -17,7 +30,10 @@ local is_initialized = false
 local command_key = "zls"
 
 local build_arg = function()
-    return string.format("-Doptimize=%s", config.options.zls.build_mode)
+    return string.format(
+        "-Doptimize=%s",
+        config.options.zls.source_install.build_mode
+    )
 end
 
 --- @param str string
@@ -33,6 +49,30 @@ local function echo_ok(str)
     end)
 end
 
+--- @param version string?
+--- @param callback fun()
+local parse_zls_index_json = function(version, callback)
+    echo_ok("start get index json")
+    M.index_json(function(data)
+        local status, tbl = pcall(vim.json.decode, data)
+        if not status then
+            vim.schedule(function()
+                lib_notify.Warn("download json failed, please try again")
+            end)
+            return
+        end
+        web_info.latest_tagged = tbl["latestTagged"]
+        web_info.latest = tbl["latest"]
+        if (not version) or (version and tbl[version]) then
+            callback()
+        else
+            vim.schedule(function()
+                lib_notify.Error("The specified zls version does not exist")
+            end)
+        end
+    end)
+end
+
 local get_bin_dir = function()
     return string.format("%s/bin", default_data_path)
 end
@@ -40,6 +80,29 @@ end
 -- get zls bin
 local get_bin = function()
     return string.format("%s/zls", get_bin_dir())
+end
+
+local add_zls_PATH = function()
+    lib_util.file_exists(get_bin(), function(res)
+        if res then
+            vim.schedule(function()
+                do
+                    -- in this scope
+                    -- we will Try injecting neovim's environment variables
+                    vim.env.PATH = string.format(
+                        "%s%s%s",
+                        vim.env.PATH,
+                        lib_util.is_win() and ";" or ":",
+                        get_bin_dir()
+                    )
+                end
+
+                if config.options.zls.enable_lspconfig then
+                    M.config_lspconfig()
+                end
+            end)
+        end
+    end)
 end
 
 M.init = function()
@@ -61,26 +124,7 @@ M.init = function()
         },
     })
 
-    lib_util.file_exists(get_bin(), function(res)
-        if res then
-            vim.schedule(function()
-                do
-                    -- in this scope
-                    -- we will Try injecting neovim's environment variables
-                    vim.env.PATH = string.format(
-                        "%s%s%s",
-                        vim.env.PATH,
-                        lib_util.is_win() and ";" or ":",
-                        get_bin_dir()
-                    )
-                end
-
-                if config.options.zls.enable_lspconfig then
-                    M.config_lspconfig()
-                end
-            end)
-        end
-    end)
+    add_zls_PATH()
 end
 
 M.deinit = function()
@@ -120,7 +164,10 @@ end
 local copy_zls = function(callbak)
     lib_util.mkdir(get_bin_dir(), function()
         lib_util.copy_file(
-            string.format("%s/zig-out/bin/zls", config.options.zls.path),
+            string.format(
+                "%s/zig-out/bin/zls",
+                config.options.zls.source_install.path
+            ),
             get_bin(),
             function()
                 echo_ok("copy zls")
@@ -130,7 +177,7 @@ local copy_zls = function(callbak)
     end)
 end
 
-M.install = function()
+local source_install = function()
     lib_util.delete_file(get_bin(), function(res)
         if not res then
             vim.schedule(function()
@@ -139,70 +186,159 @@ M.install = function()
             return
         end
 
-        lib_util.delete_dir(config.options.zls.path, function(res_n)
-            if not res_n then
-                vim.schedule(function()
-                    lib_notify.Warn("delete existing zls git dir fails")
-                end)
-                return
-            end
+        lib_util.delete_dir(
+            config.options.zls.source_install.path,
+            function(res_n)
+                if not res_n then
+                    vim.schedule(function()
+                        lib_notify.Warn("delete existing zls git dir fails")
+                    end)
+                    return
+                end
 
-            local build_zls = function()
-                local errout = uv.new_pipe()
-                ---@diagnostic disable-next-line: missing-fields
-                lib_async.spawn("zig", {
-                    cwd = config.options.zls.path,
-                    args = {
-                        "build",
-                        build_arg(),
-                    },
-                    stdio = {
-                        nil,
-                        nil,
-                        ---@diagnostic disable-next-line: assign-type-mismatch
-                        errout,
-                    },
-                }, function(code, _)
-                    if code == 0 then
-                        echo_ok("build zls")
-                        copy_zls(function()
-                            echo_ok("install zls")
-                        end)
-                    end
-                end)
+                local build_zls = function()
+                    local errout = uv.new_pipe()
+                    ---@diagnostic disable-next-line: missing-fields
+                    lib_async.spawn("zig", {
+                        cwd = config.options.zls.source_install.path,
+                        args = {
+                            "build",
+                            build_arg(),
+                        },
+                        stdio = {
+                            nil,
+                            nil,
+                            ---@diagnostic disable-next-line: assign-type-mismatch
+                            errout,
+                        },
+                    }, function(code, _)
+                        if code == 0 then
+                            echo_ok("build zls")
+                            copy_zls(function()
+                                echo_ok("install zls")
+                                add_zls_PATH()
+                            end)
+                        end
+                    end)
 
-                ---@diagnostic disable-next-line: param-type-mismatch
-                uv.read_start(errout, function(err, data)
-                    assert(not err, err)
-                    if data then
-                        vim.schedule(function()
-                            lib_notify.Warn(
-                                string.format(
-                                    "compile zls fails. err is %s",
-                                    data
+                    ---@diagnostic disable-next-line: param-type-mismatch
+                    uv.read_start(errout, function(err, data)
+                        assert(not err, err)
+                        if data then
+                            vim.schedule(function()
+                                lib_notify.Warn(
+                                    string.format(
+                                        "compile zls fails. err is %s",
+                                        data
+                                    )
                                 )
-                            )
-                        end)
-                    end
-                end)
+                            end)
+                        end
+                    end)
+                end
+                do
+                    lib_git.clone(
+                        "https://github.com/zigtools/zls.git",
+                        config.options.zls.source_install.path,
+                        function()
+                            echo_ok("clone zls")
+                            echo_ok("start build zls")
+                            build_zls()
+                        end
+                    )
+                end
             end
-            do
-                lib_git.clone(
-                    "https://github.com/zigtools/zls.git",
-                    config.options.zls.path,
-                    function()
-                        echo_ok("clone zls")
-                        build_zls()
-                    end
-                )
-            end
-        end)
+        )
     end)
 end
 
---- @param force boolean?
-M.update = function(force)
-    lib_util.dir_exists(config.options.zls.path, function(res)
+--- @param version string
+local build_download_url = function(version)
+    -- https://zigtools-releases.nyc3.digitaloceanspaces.com/zls/0.12.0-dev.111+ebbae55/x86_64-linux/zls
+
+    local arch_name = "x86_64-linux/zls"
+
+    if lib_util.is_win() then
+        arch_name = "x86_64-windows/zls.exe"
+    end
+
+    return string.format(
+        "https://zigtools-releases.nyc3.digitaloceanspaces.com/zls/%s/%s",
+        version,
+        arch_name
+    )
+end
+
+local web_install = function()
+    local web_version = config.options.zls.web_install.version
+
+    lib_util.delete_file(get_bin(), function(res)
+        if not res then
+            vim.schedule(function()
+                lib_notify.Warn("delete the existing zls bin file fails")
+            end)
+            return
+        end
+        if web_version == "latest" or web_version == "latestTagged" then
+            parse_zls_index_json(nil, function()
+                if web_version == "latest" then
+                    echo_ok("start download latest")
+                    lib_curl.download_file(
+                        build_download_url(web_info.latest),
+                        get_bin(),
+                        function()
+                            echo_ok("chmod exec zls")
+                            lib_util.chmod_exec(get_bin(), function(res)
+                                if res then
+                                    echo_ok("install zls")
+                                    add_zls_PATH()
+                                else
+                                    vim.schedule(function()
+                                        lib_notify.Warn(
+                                            "chmod exec to zls failed"
+                                        )
+                                    end)
+                                end
+                            end)
+                        end
+                    )
+                else
+                    echo_ok("start download latest_tagged")
+                    lib_curl.download_file(
+                        build_download_url(web_info.latest_tagged),
+                        get_bin(),
+                        function()
+                            echo_ok("install zls")
+                        end
+                    )
+                end
+            end)
+        else
+            parse_zls_index_json(web_version, function()
+                echo_ok("start download customed version")
+                lib_curl.download_file(
+                    ---@diagnostic disable-next-line: param-type-mismatch
+                    build_download_url(web_version),
+                    get_bin(),
+                    function()
+                        echo_ok("install zls")
+                    end
+                )
+            end)
+        end
+    end)
+end
+
+M.install = function()
+    if config.options.zls.get_method == "source_build" then
+        source_install()
+    elseif config.options.zls.get_method == "web" then
+        web_install()
+    end
+end
+
+local source_update = function(force)
+    lib_util.dir_exists(config.options.zls.source_install.path, function(res)
         if not res then
             M.install()
             return
@@ -211,7 +347,7 @@ M.update = function(force)
             local errout = uv.new_pipe()
             ---@diagnostic disable-next-line: missing-fields
             lib_async.spawn("zig", {
-                cwd = config.options.zls.path,
+                cwd = config.options.zls.source_install.path,
                 args = {
                     "build",
                     build_arg(),
@@ -250,17 +386,20 @@ M.update = function(force)
         end
 
         lib_git.latest_commit(
-            config.options.zls.path,
+            config.options.zls.source_install.path,
             false,
             function(local_commit)
                 lib_git.latest_origin_commit(
-                    config.options.zls.path,
+                    config.options.zls.source_install.path,
                     function(remote_commit)
                         if local_commit ~= remote_commit then
-                            lib_git.pull(config.options.zls.path, function()
-                                echo_ok("pull zls")
-                                build_zls()
-                            end)
+                            lib_git.pull(
+                                config.options.zls.source_install.path,
+                                function()
+                                    echo_ok("pull zls")
+                                    build_zls()
+                                end
+                            )
                         else
                             if force then
                                 build_zls()
@@ -277,6 +416,17 @@ M.update = function(force)
     end)
 end
 
+local web_update = function() end
+
+--- @param force boolean?
+M.update = function(force)
+    if config.options.zls.get_method == "source_build" then
+        source_update(force)
+    elseif config.options.zls.get_method == "web" then
+        web_update()
+    end
+end
+
 -- uninstall zls
 -- this will delete all files about zls
 M.uninstall = function()
@@ -288,15 +438,18 @@ M.uninstall = function()
             return
         end
 
-        lib_util.delete_dir(config.options.zls.path, function(res_n)
-            if not res_n then
-                vim.schedule(function()
-                    lib_notify.Warn("delete zls clone dir fails")
-                end)
-                return
+        lib_util.delete_dir(
+            config.options.zls.source_install.path,
+            function(res_n)
+                if not res_n then
+                    vim.schedule(function()
+                        lib_notify.Warn("delete zls clone dir fails")
+                    end)
+                    return
+                end
+                echo_ok("zls uninstall")
             end
-            echo_ok("zls uninstall")
-        end)
+        )
     end)
 end
 
@@ -331,7 +484,10 @@ M.index_json = function(callbak)
         if data then
             vim.schedule(function()
                 lib_notify.Warn(
-                    string.format("curl download failed, err is %s", data)
+                    string.format(
+                        "curl download zls index json failed, err is %s",
+                        data
+                    )
                 )
             end)
         end

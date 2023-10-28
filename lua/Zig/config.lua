@@ -2,17 +2,27 @@ local lib_notify = require("Zig.lib.notify")
 
 local default_data_path = vim.fn.stdpath("data") .. "/zig.nvim"
 
+--- @type source_install
+local default_source_install = {
+    path = string.format("%s/%s", default_data_path, "zls"),
+    build_mode = "ReleaseSafe",
+    commit = "latest",
+}
+
+--- @type web_install
+local default_web_install = {
+    version = "latest",
+}
+
 --- @type zig_zls_config
 local default_zls_config = {
     enable = true,
     auto_install = true,
-    path = string.format("%s/%s", default_data_path, "zls"),
-    lspconfig_opt = {},
-    enable_lspconfig = false,
     get_method = "web",
-    build_mode = "ReleaseSafe", -- only for source_build
-    commit = "latest", -- only for source_build
-    web_version = "latest", -- only for web
+    source_install = default_source_install,
+    web_install = default_web_install,
+    enable_lspconfig = false,
+    lspconfig_opt = {},
 }
 
 --- @type zig_config
