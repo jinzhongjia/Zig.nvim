@@ -211,4 +211,38 @@ M.delete_dir = function(path, callback)
     end)
 end
 
+--- @param path string
+--- @param new_path string
+--- @param callback fun()
+M.copy_file = function(path, new_path, callback)
+    local copy = function()
+        uv.fs_copyfile(path, new_path, { ficlone = true }, function(_, success)
+            if success then
+                callback()
+            else
+                vim.schedule(function()
+                    lib_notify.Error(
+                        string.format("copy %s to %s failed", path, new_path)
+                    )
+                end)
+            end
+        end)
+    end
+    M.file_exists(new_path, function(res)
+        if not res then
+            copy()
+        else
+            M.delete_file(new_path, function(res_n)
+                if res_n then
+                    copy()
+                else
+                    vim.schedule(function ()
+                        lib_notify.Warn("delete existed file failed")
+                    end)
+                end
+            end)
+        end
+    end)
+end
+
 return M

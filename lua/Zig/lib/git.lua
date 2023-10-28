@@ -141,13 +141,13 @@ M.clone = function(url, path, callback)
     local errout = uv.new_pipe()
     ---@diagnostic disable-next-line: missing-fields
     lib_async.spawn("git", {
-        cwd = path,
         args = {
             "clone",
             "--depth",
             "1",
             url,
             path,
+            "--quiet"
         },
         stdio = {
             nil,

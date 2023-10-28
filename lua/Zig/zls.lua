@@ -116,6 +116,20 @@ M.run = function(args)
     end
 end
 
+--- @param callbak fun()
+local copy_zls = function(callbak)
+    lib_util.mkdir(get_bin_dir(), function()
+        lib_util.copy_file(
+            string.format("%s/zig-out/bin/zls", config.options.zls.path),
+            get_bin(),
+            function()
+                echo_ok("copy zls")
+                callbak()
+            end
+        )
+    end)
+end
+
 M.install = function()
     lib_util.delete_file(get_bin(), function(res)
         if not res then
@@ -131,21 +145,6 @@ M.install = function()
                     lib_notify.Warn("delete existing zls git dir fails")
                 end)
                 return
-            end
-
-            local link_zls = function()
-                lib_util.mkdir(get_bin_dir(), function()
-                    lib_util.symlink(
-                        string.format(
-                            "%s/zig-out/bin/zls",
-                            config.options.zls.path
-                        ),
-                        get_bin(),
-                        function()
-                            echo_ok("link zls")
-                        end
-                    )
-                end)
             end
 
             local build_zls = function()
@@ -166,7 +165,9 @@ M.install = function()
                 }, function(code, _)
                     if code == 0 then
                         echo_ok("build zls")
-                        link_zls()
+                        copy_zls(function()
+                            echo_ok("install zls")
+                        end)
                     end
                 end)
 
@@ -223,7 +224,10 @@ M.update = function(force)
                 },
             }, function(code, _)
                 if code == 0 then
-                    echo_ok("update zls")
+                    echo_ok("build zls")
+                    copy_zls(function()
+                        echo_ok("update zls")
+                    end)
                 else
                     vim.schedule(function()
                         lib_notify.Warn("build zls fails")
