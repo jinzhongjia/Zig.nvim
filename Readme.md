@@ -11,6 +11,8 @@ I am currently developing under neovim nightly and have not tested its stability
 
 Usags:
 
+you nedd `curl` for download precompile binary.
+
 Just install this plugin with your plugin manager, and then refer below:
 
 ```lua
@@ -24,14 +26,27 @@ Default config:
 ```lua
 local default_data_path = vim.fn.stdpath("data") .. "/zig.nvim"
 
+--- @type source_install
+local default_source_install = {
+    path = string.format("%s/%s", default_data_path, "zls"),
+    build_mode = "ReleaseSafe",
+    commit = "latest",
+}
+
+--- @type web_install
+local default_web_install = {
+    version = "latest",
+}
+
 --- @type zig_zls_config
 local default_zls_config = {
     enable = true,
-    auto_install = true,
-    path = string.format("%s/%s", default_data_path, "zls"),
-    build_mode = "ReleaseSafe",
-    lspconfig_opt = {},-- Just pass in the parameters as you normally do when configuring lspconfig.
-    enable_lspconfig = false, -- When false, only zls will be added to neovim's environment variables
+    auto_install = true, -- Now this is not working
+    get_method = "web",
+    source_install = default_source_install,
+    web_install = default_web_install,
+    enable_lspconfig = false,
+    lspconfig_opt = {},
 }
 
 --- @type zig_config
