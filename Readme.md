@@ -57,3 +57,10 @@ local default_config = {
     zls = default_zls_config,
 }
 ```
+
+Command:
+
+- `Zig zls`
+- `Zig fmt`
+- `Zig build`
+- `Zig version`
