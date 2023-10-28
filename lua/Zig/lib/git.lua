@@ -147,7 +147,7 @@ M.clone = function(url, path, callback)
             "1",
             url,
             path,
-            "--quiet"
+            "--quiet",
         },
         stdio = {
             nil,
