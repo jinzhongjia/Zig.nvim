@@ -63,7 +63,7 @@ local parse_zls_index_json = function(version, callback)
         end
         web_info.latest_tagged = tbl["latestTagged"]
         web_info.latest = tbl["latest"]
-        if (not version) or (version and tbl[version]) then
+        if (not version) or (version and tbl["versions"][version]) then
             callback()
         else
             vim.schedule(function()
@@ -86,9 +86,7 @@ local add_zls_PATH = function()
     lib_util.file_exists(get_bin(), function(res)
         if res then
             vim.schedule(function()
-                do
-                    -- in this scope
-                    -- we will Try injecting neovim's environment variables
+                if not string.match(vim.env.PATH, get_bin_dir()) then
                     vim.env.PATH = string.format(
                         "%s%s%s",
                         vim.env.PATH,
@@ -96,13 +94,23 @@ local add_zls_PATH = function()
                         get_bin_dir()
                     )
                 end
-
-                if config.options.zls.enable_lspconfig then
-                    M.config_lspconfig()
-                end
             end)
         end
     end)
+end
+
+local remove_zls_PATH = function()
+    if string.match(vim.env.PATH, get_bin_dir()) then
+        vim.env.PATH = string.gsub(
+            vim.env.PATH,
+            string.format(
+                "%s%s",
+                lib_util.is_win() and ";" or ":",
+                get_bin_dir()
+            ),
+            ""
+        )
+    end
 end
 
 M.init = function()
@@ -125,6 +133,10 @@ M.init = function()
     })
 
     add_zls_PATH()
+
+    if config.options.zls.enable_lspconfig then
+        M.config_lspconfig()
+    end
 end
 
 M.deinit = function()
@@ -288,8 +300,8 @@ local web_install = function()
                         get_bin(),
                         function()
                             echo_ok("chmod exec zls")
-                            lib_util.chmod_exec(get_bin(), function(res)
-                                if res then
+                            lib_util.chmod_exec(get_bin(), function(res_n)
+                                if res_n then
                                     echo_ok("install zls")
                                     add_zls_PATH()
                                 else
@@ -308,7 +320,19 @@ local web_install = function()
                         build_download_url(web_info.latest_tagged),
                         get_bin(),
                         function()
-                            echo_ok("install zls")
+                            echo_ok("chmod exec zls")
+                            lib_util.chmod_exec(get_bin(), function(res_n)
+                                if res_n then
+                                    echo_ok("install zls")
+                                    add_zls_PATH()
+                                else
+                                    vim.schedule(function()
+                                        lib_notify.Warn(
+                                            "chmod exec to zls failed"
+                                        )
+                                    end)
+                                end
+                            end)
                         end
                     )
                 end
@@ -321,7 +345,17 @@ local web_install = function()
                     build_download_url(web_version),
                     get_bin(),
                     function()
-                        echo_ok("install zls")
+                        echo_ok("chmod exec zls")
+                        lib_util.chmod_exec(get_bin(), function(res_n)
+                            if res_n then
+                                echo_ok("install zls")
+                                add_zls_PATH()
+                            else
+                                vim.schedule(function()
+                                    lib_notify.Warn("chmod exec to zls failed")
+                                end)
+                            end
+                        end)
                     end
                 )
             end)
@@ -416,7 +450,104 @@ local source_update = function(force)
     end)
 end
 
-local web_update = function() end
+--- @param callback fun(version:string?)
+local get_zls_version = function(callback)
+    lib_util.file_exists(get_bin(), function(res)
+        if res then
+            local errout = uv.new_pipe()
+            local out = uv.new_pipe()
+            ---@diagnostic disable-next-line: missing-fields
+            local handle, pid = lib_async.spawn(get_bin(), {
+                args = {
+                    "--version",
+                },
+                stdio = {
+                    nil,
+                    ---@diagnostic disable-next-line: assign-type-mismatch
+                    out,
+                    ---@diagnostic disable-next-line: assign-type-mismatch
+                    errout,
+                },
+            }, function(code, _) end)
+
+            local tmp = true
+            ---@diagnostic disable-next-line: param-type-mismatch
+            uv.read_start(out, function(err, data)
+                assert(not err, err)
+
+                if tmp then
+                    if data then
+                        tmp = false
+                        callback(string.gsub(data, "\n", ""))
+                    else
+                        callback(nil)
+                    end
+                end
+            end)
+
+            ---@diagnostic disable-next-line: param-type-mismatch
+            uv.read_start(errout, function(err, data)
+                assert(not err, err)
+                if data then
+                    vim.schedule(function()
+                        lib_notify.Warn(
+                            string.format(
+                                "get zls version failed. err is %s",
+                                data
+                            )
+                        )
+                    end)
+                end
+            end)
+        else
+            callback(nil)
+        end
+    end)
+end
+
+local web_update = function()
+    get_zls_version(function(version)
+        if not version then
+            echo_ok("start install zls")
+            web_install()
+            return
+        end
+
+        local web_version = config.options.zls.web_install.version
+        if web_version == "latest" or web_version == "latestTagged" then
+            parse_zls_index_json(nil, function()
+                local latest_version
+                local url
+                if web_version == "latest" then
+                    latest_version = web_info.latest
+                    url = build_download_url(web_info.latest)
+                else
+                    latest_version = web_info.latest_tagged
+                    url = build_download_url(web_info.latest)
+                end
+                if latest_version ~= version then
+                    echo_ok("start download new zls")
+                    return lib_curl.download_file(url, get_bin(), function()
+                        echo_ok("chmod exec zls")
+                        lib_util.chmod_exec(get_bin(), function(res)
+                            if res then
+                                echo_ok("update zls")
+                            else
+                                vim.schedule(function()
+                                    lib_notify.Warn("chmod exec to zls failed")
+                                end)
+                            end
+                        end)
+                    end)
+                else
+                    vim.schedule(function()
+                        lib_notify.Info("zls is the latest")
+                    end)
+                end
+            end)
+        end
+    end)
+end
 
 --- @param force boolean?
 M.update = function(force)
@@ -447,6 +578,9 @@ M.uninstall = function()
                     end)
                     return
                 end
+                vim.schedule(function()
+                    remove_zls_PATH()
+                end)
                 echo_ok("zls uninstall")
             end
         )
