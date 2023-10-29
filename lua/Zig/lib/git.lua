@@ -26,6 +26,8 @@ M.fetch = function(path, callback)
             errout,
         },
     }, function(code, _)
+        ---@diagnostic disable-next-line: param-type-mismatch
+        uv.close(errout)
         if code == 0 then
             callback()
         end
@@ -78,7 +80,12 @@ M.latest_commit = function(path, origin, callback)
             ---@diagnostic disable-next-line: assign-type-mismatch
             errout,
         },
-    }, function(_, _) end)
+    }, function(_, _)
+        ---@diagnostic disable-next-line: param-type-mismatch
+        uv.close(errout)
+        ---@diagnostic disable-next-line: param-type-mismatch
+        uv.close(out)
+    end)
     ---@diagnostic disable-next-line: param-type-mismatch
     uv.read_start(errout, function(err, data)
         assert(not err, err)
@@ -118,6 +125,8 @@ M.pull = function(path, callback)
             errout,
         },
     }, function(code, _)
+        ---@diagnostic disable-next-line: param-type-mismatch
+        uv.close(errout)
         if code == 0 then
             callback()
         end
@@ -156,6 +165,8 @@ M.clone = function(url, path, callback)
             errout,
         },
     }, function(code, _)
+        ---@diagnostic disable-next-line: param-type-mismatch
+        uv.close(errout)
         if code == 0 then
             callback()
         end

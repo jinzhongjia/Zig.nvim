@@ -140,7 +140,12 @@ local get_zls_version = function(callback)
                     ---@diagnostic disable-next-line: assign-type-mismatch
                     errout,
                 },
-            }, function(_, _) end)
+            }, function(_, _)
+                ---@diagnostic disable-next-line: param-type-mismatch
+                uv.close(out)
+                ---@diagnostic disable-next-line: param-type-mismatch
+                uv.close(errout)
+            end)
 
             local tmp = true
             ---@diagnostic disable-next-line: param-type-mismatch
@@ -624,7 +629,12 @@ M.index_json = function(callbak)
             "-s",
             "https://zigtools-releases.nyc3.digitaloceanspaces.com/zls/index.json",
         },
-    }, function(_, _) end)
+    }, function(_, _)
+        ---@diagnostic disable-next-line: param-type-mismatch
+        uv.close(out)
+        ---@diagnostic disable-next-line: param-type-mismatch
+        uv.close(errout)
+    end)
     ---@diagnostic disable-next-line: param-type-mismatch
     uv.read_start(out, function(err, data)
         assert(not err, err)
