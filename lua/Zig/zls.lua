@@ -3,7 +3,7 @@ local command = require("Zig.command")
 local config = require("Zig.config")
 local lib_async = require("Zig.lib.async")
 local lib_curl = require("Zig.lib.curl")
-local lib_debug = require("Zig.lib.debug")
+-- local lib_debug = require("Zig.lib.debug")
 local lib_git = require("Zig.lib.git")
 local lib_notify = require("Zig.lib.notify")
 local lib_util = require("Zig.lib.util")
@@ -37,22 +37,31 @@ local build_arg = function()
 end
 
 --- @param str string
-local function echo_ok(str)
+--- @param ok boolean
+local function echo_ok(str, ok)
     vim.schedule(function()
-        api.nvim_echo({
-            { "Zig.nvim:", "" },
-            { " ", "" },
-            { str, "DiagnosticInfo" },
-            { " ", "" },
-            { "OK!", "DiagnosticOk" },
-        }, false, {}) -- code
+        if ok then
+            api.nvim_echo({
+                { "Zig.nvim:", "" },
+                { " ", "" },
+                { str, "DiagnosticInfo" },
+                { " ", "" },
+                { "OK!", "DiagnosticOk" },
+            }, false, {}) -- code
+        else
+            api.nvim_echo({
+                { "Zig.nvim:", "" },
+                { " ", "" },
+                { str, "DiagnosticInfo" },
+            }, false, {}) -- code
+        end
     end)
 end
 
 --- @param version string?
 --- @param callback fun()
 local parse_zls_index_json = function(version, callback)
-    echo_ok("start get index json")
+    echo_ok("start get index json", false)
     M.index_json(function(data)
         local status, tbl = pcall(vim.json.decode, data)
         if not status then
@@ -120,7 +129,7 @@ local get_zls_version = function(callback)
             local errout = uv.new_pipe()
             local out = uv.new_pipe()
             ---@diagnostic disable-next-line: missing-fields
-            local handle, pid = lib_async.spawn(get_bin(), {
+            lib_async.spawn(get_bin(), {
                 args = {
                     "--version",
                 },
@@ -131,7 +140,7 @@ local get_zls_version = function(callback)
                     ---@diagnostic disable-next-line: assign-type-mismatch
                     errout,
                 },
-            }, function(code, _) end)
+            }, function(_, _) end)
 
             local tmp = true
             ---@diagnostic disable-next-line: param-type-mismatch
@@ -248,7 +257,7 @@ local copy_zls = function(callbak)
             ),
             get_bin(),
             function()
-                echo_ok("copy zls")
+                echo_ok("copy zls", false)
                 callbak()
             end
         )
@@ -291,9 +300,9 @@ local source_install = function()
                         },
                     }, function(code, _)
                         if code == 0 then
-                            echo_ok("build zls")
+                            echo_ok("build zls", false)
                             copy_zls(function()
-                                echo_ok("install zls")
+                                echo_ok("install zls", true)
                                 add_zls_PATH()
                             end)
                         end
@@ -315,12 +324,12 @@ local source_install = function()
                     end)
                 end
                 do
+                    echo_ok("clone zls", false)
                     lib_git.clone(
                         "https://github.com/zigtools/zls.git",
                         config.options.zls.source_install.path,
                         function()
-                            echo_ok("clone zls")
-                            echo_ok("start build zls")
+                            echo_ok("start build zls", false)
                             build_zls()
                         end
                     )
@@ -360,15 +369,15 @@ local web_install = function()
         if web_version == "latest" or web_version == "latestTagged" then
             parse_zls_index_json(nil, function()
                 if web_version == "latest" then
-                    echo_ok("start download latest")
+                    echo_ok("start download latest", false)
                     lib_curl.download_file(
                         build_download_url(web_info.latest),
                         get_bin(),
                         function()
-                            echo_ok("chmod exec zls")
+                            echo_ok("chmod exec zls", false)
                             lib_util.chmod_exec(get_bin(), function(res_n)
                                 if res_n then
-                                    echo_ok("install zls")
+                                    echo_ok("install zls", true)
                                     add_zls_PATH()
                                 else
                                     vim.schedule(function()
@@ -381,15 +390,15 @@ local web_install = function()
                         end
                     )
                 else
-                    echo_ok("start download latest_tagged")
+                    echo_ok("start download latest_tagged", false)
                     lib_curl.download_file(
                         build_download_url(web_info.latest_tagged),
                         get_bin(),
                         function()
-                            echo_ok("chmod exec zls")
+                            echo_ok("chmod exec zls", false)
                             lib_util.chmod_exec(get_bin(), function(res_n)
                                 if res_n then
-                                    echo_ok("install zls")
+                                    echo_ok("install zls", true)
                                     add_zls_PATH()
                                 else
                                     vim.schedule(function()
@@ -405,16 +414,16 @@ local web_install = function()
             end)
         else
             parse_zls_index_json(web_version, function()
-                echo_ok("start download customed version")
+                echo_ok("start download customed version", false)
                 lib_curl.download_file(
                     ---@diagnostic disable-next-line: param-type-mismatch
                     build_download_url(web_version),
                     get_bin(),
                     function()
-                        echo_ok("chmod exec zls")
+                        echo_ok("chmod exec zls", false)
                         lib_util.chmod_exec(get_bin(), function(res_n)
                             if res_n then
-                                echo_ok("install zls")
+                                echo_ok("install zls", true)
                                 add_zls_PATH()
                             else
                                 vim.schedule(function()
@@ -460,9 +469,8 @@ local source_update = function(force)
                 },
             }, function(code, _)
                 if code == 0 then
-                    echo_ok("build zls")
                     copy_zls(function()
-                        echo_ok("update zls")
+                        echo_ok("update zls", true)
                     end)
                 else
                     vim.schedule(function()
@@ -470,7 +478,7 @@ local source_update = function(force)
                     end)
                 end
             end)
-            echo_ok("start build")
+            echo_ok("start build", false)
 
             ---@diagnostic disable-next-line: param-type-mismatch
             uv.read_start(errout, function(err, data)
@@ -493,10 +501,11 @@ local source_update = function(force)
                     config.options.zls.source_install.path,
                     function(remote_commit)
                         if local_commit ~= remote_commit then
+                            echo_ok("pull zls", true)
                             lib_git.pull(
                                 config.options.zls.source_install.path,
                                 function()
-                                    echo_ok("pull zls")
+                                    echo_ok("build zls", false)
                                     build_zls()
                                 end
                             )
@@ -519,7 +528,7 @@ end
 local web_update = function()
     get_zls_version(function(version)
         if not version then
-            echo_ok("start install zls")
+            echo_ok("start install zls", false)
             web_install()
             return
         end
@@ -537,12 +546,12 @@ local web_update = function()
                     url = build_download_url(web_info.latest)
                 end
                 if latest_version ~= version then
-                    echo_ok("start download new zls")
+                    echo_ok("start download new zls", false)
                     return lib_curl.download_file(url, get_bin(), function()
-                        echo_ok("chmod exec zls")
+                        echo_ok("chmod exec zls", false)
                         lib_util.chmod_exec(get_bin(), function(res)
                             if res then
-                                echo_ok("update zls")
+                                echo_ok("update zls", true)
                             else
                                 vim.schedule(function()
                                     lib_notify.Warn("chmod exec to zls failed")
@@ -592,7 +601,7 @@ M.uninstall = function()
                 vim.schedule(function()
                     remove_zls_PATH()
                 end)
-                echo_ok("zls uninstall")
+                echo_ok("zls uninstall", true)
             end
         )
     end)

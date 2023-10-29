@@ -261,6 +261,8 @@ M.chmod_exec = function(path, callback)
                 uv.fs_chmod(path, plus_exec, function(_, success)
                     callback(success)
                 end)
+            else
+                callback(true)
             end
         else
             callback(false)
