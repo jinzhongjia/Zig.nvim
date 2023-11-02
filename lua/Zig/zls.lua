@@ -3,7 +3,7 @@ local command = require("Zig.command")
 local config = require("Zig.config")
 local lib_async = require("Zig.lib.async")
 local lib_curl = require("Zig.lib.curl")
--- local lib_debug = require("Zig.lib.debug")
+local lib_debug = require("Zig.lib.debug")
 local lib_git = require("Zig.lib.git")
 local lib_notify = require("Zig.lib.notify")
 local lib_util = require("Zig.lib.util")
@@ -128,6 +128,9 @@ local get_zls_version = function(callback)
         if res then
             local errout = uv.new_pipe()
             local out = uv.new_pipe()
+
+            --- @type string
+            local out_data = ""
             ---@diagnostic disable-next-line: missing-fields
             lib_async.spawn(get_bin(), {
                 args = {
@@ -140,11 +143,14 @@ local get_zls_version = function(callback)
                     ---@diagnostic disable-next-line: assign-type-mismatch
                     errout,
                 },
-            }, function(_, _)
+            }, function(code, _)
                 ---@diagnostic disable-next-line: param-type-mismatch
                 uv.close(out)
                 ---@diagnostic disable-next-line: param-type-mismatch
                 uv.close(errout)
+                if code == 0 then
+                    callback(string.gsub(out_data, "\n", ""))
+                end
             end)
 
             local tmp = true
@@ -152,13 +158,8 @@ local get_zls_version = function(callback)
             uv.read_start(out, function(err, data)
                 assert(not err, err)
 
-                if tmp then
-                    if data then
-                        tmp = false
-                        callback(string.gsub(data, "\n", ""))
-                    else
-                        callback(nil)
-                    end
+                if data then
+                    out_data = out_data .. data
                 end
             end)
 
@@ -616,6 +617,8 @@ end
 M.index_json = function(callbak)
     local out = uv.new_pipe()
     local errout = uv.new_pipe()
+    --- @type string
+    local out_data = ""
     ---@diagnostic disable-next-line: missing-fields
     lib_async.spawn("curl", {
         stdio = {
@@ -629,17 +632,20 @@ M.index_json = function(callbak)
             "-s",
             "https://zigtools-releases.nyc3.digitaloceanspaces.com/zls/index.json",
         },
-    }, function(_, _)
+    }, function(code, _)
         ---@diagnostic disable-next-line: param-type-mismatch
         uv.close(out)
         ---@diagnostic disable-next-line: param-type-mismatch
         uv.close(errout)
+        if code == 0 then
+            callbak(out_data)
+        end
     end)
     ---@diagnostic disable-next-line: param-type-mismatch
     uv.read_start(out, function(err, data)
         assert(not err, err)
         if data then
-            callbak(data)
+            out_data = out_data .. data
         end
     end)
     ---@diagnostic disable-next-line: param-type-mismatch

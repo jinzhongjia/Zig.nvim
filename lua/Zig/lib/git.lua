@@ -61,6 +61,8 @@ end
 M.latest_commit = function(path, origin, callback)
     local errout = uv.new_pipe()
     local out = uv.new_pipe()
+    --- @type string
+    local out_data = ""
     local args = {
         "log",
         '--pretty=format:"%h"',
@@ -80,11 +82,14 @@ M.latest_commit = function(path, origin, callback)
             ---@diagnostic disable-next-line: assign-type-mismatch
             errout,
         },
-    }, function(_, _)
+    }, function(code, _)
         ---@diagnostic disable-next-line: param-type-mismatch
         uv.close(errout)
         ---@diagnostic disable-next-line: param-type-mismatch
         uv.close(out)
+        if code == 0 then
+            callback(out_data)
+        end
     end)
     ---@diagnostic disable-next-line: param-type-mismatch
     uv.read_start(errout, function(err, data)
@@ -102,7 +107,7 @@ M.latest_commit = function(path, origin, callback)
     uv.read_start(out, function(err, data)
         assert(not err, err)
         if data then
-            callback(data)
+            out_data = out_data .. data
         end
     end)
 end
