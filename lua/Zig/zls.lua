@@ -573,6 +573,10 @@ local web_update = function()
                     end)
                 end
             end)
+        else
+            vim.schedule(function()
+                lib_notify.Info("you are using a customed version!")
+            end)
         end
     end)
 end
