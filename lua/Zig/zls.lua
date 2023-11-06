@@ -153,7 +153,6 @@ local get_zls_version = function(callback)
                 end
             end)
 
-            local tmp = true
             ---@diagnostic disable-next-line: param-type-mismatch
             uv.read_start(out, function(err, data)
                 assert(not err, err)
@@ -552,7 +551,10 @@ local web_update = function()
                     url = build_download_url(web_info.latest)
                 end
                 if latest_version ~= version then
-                    echo_ok("start download new zls", false)
+                    echo_ok(
+                        string.format("start download new %s zls", web_version),
+                        false
+                    )
                     return lib_curl.download_file(url, get_bin(), function()
                         echo_ok("chmod exec zls", false)
                         lib_util.chmod_exec(get_bin(), function(res)
