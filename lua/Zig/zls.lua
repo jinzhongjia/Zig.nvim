@@ -555,7 +555,7 @@ local web_update = function()
                         string.format("start download new %s zls", web_version),
                         false
                     )
-                    return lib_curl.download_file(url, get_bin(), function()
+                    lib_curl.download_file(url, get_bin(), function()
                         echo_ok("chmod exec zls", false)
                         lib_util.chmod_exec(get_bin(), function(res)
                             if res then

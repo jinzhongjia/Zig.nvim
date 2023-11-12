@@ -28,7 +28,7 @@ M.download_file = function(url, path, callback)
             callback()
         else
             vim.schedule(function()
-                lib_notify.Warn("sorry, Some errors occurred in curl")
+                lib_notify.Warn("sorry, Some errors occurred in curl, maybe you nedd to retry")
             end)
         end
     end)
