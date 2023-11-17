@@ -14,7 +14,9 @@ M.setup = function(user_config)
     -- init module
     local modules = require("Zig.modules")
     for _, module in pairs(modules) do
-        module.init()
+        vim.schedule(function()
+            module.init()
+        end)
     end
 end
 
