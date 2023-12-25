@@ -205,7 +205,13 @@ M.init = function()
     add_zls_PATH()
 
     if config.options.zls.enable_lspconfig then
-        M.config_lspconfig()
+        lib_util.file_exists(get_bin(), function(res)
+            if res then
+                vim.schedule(function()
+                    M.config_lspconfig()
+                end)
+            end
+        end)
     end
 end
 
