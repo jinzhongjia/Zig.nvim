@@ -88,7 +88,11 @@ end
 
 -- get zls bin
 local get_bin = function()
-    return string.format("%s/zls", get_bin_dir())
+    return string.format(
+        "%s/zls%s",
+        get_bin_dir(),
+        lib_util.is_win() and ".exe" or ""
+    )
 end
 
 local add_zls_PATH = function()
